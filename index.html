@@ -600,8 +600,27 @@ fetch(geojsonUrl)
     L.geoJSON(data, {
       style: function (feature) {
         // Проверяем, является ли текущая страна Украиной по ее ISO и имени в датасете
-        const isUkraine = feature.properties.ISO_A3 === "UKR" || 
-                          feature.properties.ADMIN === "Ukraine";
+        const props = feature.properties || {};
+        const countryName = String(
+          props.name ||
+          props.NAME ||
+          props.ADMIN ||
+          props.admin ||
+          ""
+        ).trim().toLowerCase();
+
+        const countryIso3 = String(
+          props["ISO3166-1-Alpha-3"] ||
+          props.ISO_A3 ||
+          props.iso_a3 ||
+          ""
+        ).trim().toUpperCase();
+
+        const isUkraine =
+          countryIso3 === "UKR" ||
+          countryName === "ukraine" ||
+          countryName === "україна" ||
+          countryName === "украина";
 
         if (isUkraine) {
           return {
