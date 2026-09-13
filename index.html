@@ -294,8 +294,8 @@ body {
   align-items: center;
   justify-content: center;
 
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
 
   border-radius: 50%;
 
@@ -308,6 +308,7 @@ body {
     0 0 12px rgba(255, 153, 0, 0.9),
     0 3px 10px rgba(0, 0, 0, 0.6);
 }
+
 
 .neptun-alert-pulse {
   animation: neptunPulse 1.2s infinite;
@@ -417,6 +418,19 @@ body {
 
 }
 
+
+/* Увеличенный шрифт во всех popup: в 2 раза */
+.leaflet-popup-content {
+  font-size: 32px !important;
+  line-height: 1.35 !important;
+}
+.leaflet-popup-content b,
+.leaflet-popup-content strong {
+  font-size: 32px !important;
+}
+.leaflet-popup-content a {
+  font-size: 32px !important;
+}
 </style>
 </head>
 
@@ -558,7 +572,7 @@ const categories = {
 const map =
   L.map("map", {
     zoomControl: true
-  }).setView([47.60, 32.25], 6);
+  }).setView([47.60, 32.25], 7);
 
 /* =========================================================
    TILE
@@ -708,12 +722,12 @@ function openOfflineDB() {
           const db =
             event.target.result;
 
-          db.onversionchange =
-            function() {
+          // db.onversionchange =
+          //   function() {
 
-              db.close();
+          //     db.close();
 
-            };
+          //   };
 
           resolve(db);
 
@@ -1587,6 +1601,7 @@ function createEmojiIcon(
           box-shadow:
             0 0 10px ${color},
             0 2px 8px rgba(0,0,0,.5);
+          
         "
       >${emoji}</div>`,
 
@@ -1603,34 +1618,50 @@ function createEmojiIcon(
 ========================================================= */
 
 function createNeptunThreatIcon(
-  type
+  type,
+  rotate = 45
 ) {
 
-  let emoji =
-    "🚀";
+  const normalizedType =
+    normalizeType(type);
 
-  if (type === "uav") {
+  let iconFile = ".png";
+  let shouldRotate = true;
 
-    emoji =
-      "🛩️";
+  if (normalizedType === "fpv") {
+    iconFile = "fpv.png";
+    // FPV marker is always shown without rotation.
+    shouldRotate = false;
+  }
+  else if (normalizedType === "recon") {
+    iconFile = "recon.png";
+  }
+  else if (normalizedType === "uav") {
+    iconFile = "uav.png";
+  }
 
-  }
-  else if (type === "fpv"){
-    emoji =
-      "🚁";
-  }
-  else if (type === "recon"){
-    emoji =
-      "✈️";
-  }
+  const rotation =
+    shouldRotate && rotate != null
+      ? rotate - 45
+      : 0;
+
   return L.divIcon({
 
-    className: "",
+    className: "neptun-threat-icon",
 
-    html:
-      `<div
+    html: `\n      <div
         class="neptun-threat-marker"
-      >${emoji}</div>`,
+        style="transform: rotate(${rotation}deg);"
+      >
+        <img
+          src="./icon/${iconFile}"
+          alt=""
+          draggable="false"
+          style="width:46px;height:46px;object-fit:contain;display:block;"
+          onerror="this.onerror=null;this.src='./icon/.png';"
+        >
+      </div>
+    `,
 
     iconSize: [38, 38],
 
@@ -2959,10 +2990,49 @@ function getThreatTitle(
 }
 
 /* =========================================================
+   KEEP OPEN THREAT POPUP DURING NEPTUN/Nahr RERENDER
+========================================================= */
+function getThreatPopupKey(threat) {
+  if (!threat) return null;
+  const id = threat.id ?? threat.uuid ?? threat._id ?? threat.threatId ?? threat.threat_id;
+  if (id != null && String(id).trim() !== "") return "id:" + String(id);
+  const position = getThreatPosition(threat);
+  return [
+    "fallback",
+    position ? Number(position[0]).toFixed(6) : "",
+    position ? Number(position[1]).toFixed(6) : "",
+    normalizeType(threat.type),
+    threat.title ?? threat.name ?? "",
+    threat.locality ?? ""
+  ].join("|");
+}
+
+function rememberOpenThreatPopup() {
+  let key = null;
+  neptunThreatLayerGroup.eachLayer(layer => {
+    if (!key && typeof layer.isPopupOpen === "function" && layer.isPopupOpen()) {
+      key = layer._threatPopupKey ?? null;
+    }
+  });
+  return key;
+}
+
+function restoreOpenThreatPopup(key) {
+  if (!key) return;
+  neptunThreatLayerGroup.eachLayer(layer => {
+    if (layer._threatPopupKey === key && typeof layer.openPopup === "function") {
+      layer.openPopup();
+    }
+  });
+}
+
+/* =========================================================
    RENDER NEPTUN THREATS
 ========================================================= */
 
 function renderNeptunThreats() {
+
+  const openThreatPopupKey = rememberOpenThreatPopup();
 
   neptunThreatLayerGroup.clearLayers();
 
@@ -3020,13 +3090,39 @@ function renderNeptunThreats() {
           {
             icon:
               createNeptunThreatIcon(
-                threat.type
+                threat.type,
+                threat.heading
               )
+            
           }
         );
+        console.log(threat.type,threat.heading)
+      marker._threatPopupKey = getThreatPopupKey(threat);
 
+      const type =
+    normalizeType(
+      threat?.type
+    );
+  let emoji =
+    "🚀";
+
+  if (type === "uav") {
+
+    emoji =
+      "🛩️";
+
+  }
+  else if (type === "fpv"){
+    emoji =
+      "🚁";
+  }
+  else if (type === "recon"){
+    emoji =
+      "✈️";
+  }
       marker.bindPopup(
         `
+        <div style="font-size:18px; line-height:1.35;">
         <b>
           Помічана повітряна загроза
         </b>
@@ -3034,7 +3130,7 @@ function renderNeptunThreats() {
         ${getThreatTitle(
             threat
   
-          )}
+          ) + emoji}
         ${
           threat.advisory
             ? `
@@ -3045,13 +3141,18 @@ function renderNeptunThreats() {
             `
             : ""
         }
+        <br>
+        Курс : ${threat.heading != null?String(threat.heading) + "°":"Невідомо"}
            <br>
-       ${threat.explanationShort
-}  
+       ${threat.explanationShort}  
        
+        
+        </div>
+        
+        <div style="font-size:13px !important;  line-height:1.35;">
         <br>
         <br>
-        дані від NEPTUN
+        Дані зібрано з <a style="font-size:13px !important;" href="https://neptun.in.ua/">NEPTUN</a>
         `
       );
 
@@ -3068,10 +3169,14 @@ function renderNeptunThreats() {
     }
   );
 
+  restoreOpenThreatPopup(openThreatPopupKey);
+
   updateVisibility();
 
 }
 function renderNahrThreats() {
+
+  const openThreatPopupKey = rememberOpenThreatPopup();
 
   neptunThreatLayerGroup.clearLayers();
 
@@ -3134,8 +3239,32 @@ function renderNahrThreats() {
           }
         );
 
+      marker._threatPopupKey = getThreatPopupKey(threat);
+
+      const type =
+    normalizeType(
+      threat?.type
+    );
+  let emoji =
+    "🚀";
+
+  if (type === "uav") {
+
+    emoji =
+      "🛩️";
+
+  }
+  else if (type === "fpv"){
+    emoji =
+      "🚁";
+  }
+  else if (type === "recon"){
+    emoji =
+      "✈️";
+  }
       marker.bindPopup(
         `
+        <div style="font-size:18px; line-height:1.35;">
         <b>
           Помічана повітряна загроза
         </b>
@@ -3143,7 +3272,7 @@ function renderNahrThreats() {
         ${getThreatTitle(
             threat
   
-          )}
+          ) + emoji}
         ${
           threat.advisory
             ? `
@@ -3155,19 +3284,24 @@ function renderNahrThreats() {
             : ""
         }
         <br>
-        Місце знаходження : 
-        ${threat.locality
-}
+        Курс : ${threat.heading != null?String(threat.heading) + "°":"Невідомо"}
+           <br>
+       ${threat.explanationShort}  
+       
+        
+        </div>
+        
+        <div style="font-size:13px !important;  line-height:1.35;">
         <br>
         <br>
-        дані від Nahr
+        Дані зібрано з <a style="font-size:13px !important;" href="https://neptun.in.ua/">NEPTUN</a>
         `
       );
 
       marker._category =
         NEPTUN_CATEGORY_UAV;
 
-      marker._nahrThreat =
+      marker._neptunThreat =
         true;
 
       marker.addTo(
@@ -3176,6 +3310,8 @@ function renderNahrThreats() {
 
     }
   );
+
+  restoreOpenThreatPopup(openThreatPopupKey);
 
   updateVisibility();
 
