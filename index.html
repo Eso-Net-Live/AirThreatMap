@@ -588,6 +588,42 @@ L.tileLayer(
 ).addTo(map);
 
 /* =========================================================
+   МАСКА ЗАТЕМНЕНИЯ СТРАН (КРОМЕ УКРАИНЫ)
+========================================================= */
+
+// URL-адрес проверенного файла с геоданными границ всех стран мира
+const geojsonUrl = "https://githubusercontent.com";
+
+fetch(geojsonUrl)
+  .then(response => response.json())
+  .then(data => {
+    L.geoJSON(data, {
+      style: function (feature) {
+        // Проверяем, является ли текущая страна Украиной по ее ISO и имени в датасете
+        const isUkraine = feature.properties.ISO_A3 === "UKR" || 
+                          feature.properties.ADMIN === "Ukraine";
+
+        if (isUkraine) {
+          return {
+            fillOpacity: 0,       // Украина остается полностью прозрачной (видна обычная карта)
+            color: "transparent", // Скрываем внешнюю программную границу (будет видна родная граница с тайлов)
+            weight: 0
+          };
+        } else {
+          return {
+            fillColor: "#121212", // Цвет затемнения для остальных стран (можно заменить на #000000)
+            fillOpacity: 0.75,    // Плотность маски (0.8 — темнее, 0.5 — светлее)
+            color: "#2c2c2c",     // Цвет линий границ между другими странами
+            weight: 1             // Толщина линий границ других стран
+          };
+        }
+      }
+    }).addTo(map);
+  })
+  .catch(error => console.error("Ошибка загрузки границ стран:", error));
+
+
+/* =========================================================
    LAYERS
 ========================================================= */
 
@@ -1625,7 +1661,7 @@ function createNeptunThreatIcon(
   const normalizedType =
     normalizeType(type);
 
-  let iconFile = ".png";
+  let iconFile = "all.png";
   let shouldRotate = true;
 
   if (normalizedType === "fpv") {
