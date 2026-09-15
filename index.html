@@ -310,8 +310,37 @@ body {
     0 0 12px rgba(255, 153, 0, 0.9),
     0 3px 10px rgba(0, 0, 0, 0.6);
 }
+.neptun-threat-marker.redLevel{
+  background: rgba(255, 0, 0, 0.92);
+  box-shadow:
+    0 0 30px 5px rgba(255, 0, 0, 0.9),
+    0 3px 10px rgba(0, 0, 0, 0.6);
+}
+.mapa-threat-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
+  width: 40px;
+  height: 40px;
 
+  border-radius: 50%;
+
+  background: rgba(255, 153, 0, 0.92);
+  border: 3px solid white;
+
+  font-size: 21px;
+
+  box-shadow:
+    0 0 12px rgba(255, 153, 0, 0.92),
+    0 3px 10px rgba(0, 0, 0, 0.6);
+}
+.mapa-threat-marker.redLevel {
+  background: rgba(255, 0, 0, 0.92);
+  box-shadow:
+    0 0 12px rgba(255, 0, 0, 0.9),
+    0 3px 10px rgba(0, 0, 0, 0.6);
+}
 .neptun-alert-pulse {
   animation: neptunPulse 1.2s infinite;
 }
@@ -490,7 +519,7 @@ body {
     target="_blank"
     rel="noopener noreferrer"
   >
-    Дані: NEPTUN
+    Дані: NEPTUN • MAPA.UA
   </a>
 </div>
 
@@ -524,11 +553,20 @@ const NEPTUN_ALERTS_URL =
 const NEPTUN_THREATS_URL =
   NEPTUN_URL + "/api/v1/threats";
 
+const MAPA_THREATS_URL =
+  "https://mapa.ua/api/v1/current";
+
+function getMapaThreatsURL() {
+  return MAPA_THREATS_URL + "?t=" + Date.now();
+}
+
+
 const NAHR_THREATS_URL = 
   NAHR_URL + "api/alerts?et=1789153733-yveXuMVeU6fjv1EfFNowVYVTqmT2JumGutWY4XqOW8M";
   
 const NEPTUN_CATEGORY_ALERT = "1";
 const NEPTUN_CATEGORY_UAV = "2";
+const MAPA_CATEGORY_THREAT = "3";
 
 /*
  * NEPTUN API не отдаёт нам готовые границы через указанные
@@ -564,6 +602,14 @@ const categories = {
     color: "#ff9900",
     minZoom: 0,
     show: true
+  },
+  "3": {
+    name: "🛩️ БПЛА (Розширений режим)",
+    emoji: "🛩️",
+    radius: 2500,
+    color: "#ff9900",
+    minZoom: 0,
+    show: false
   },
 
 };
@@ -655,6 +701,9 @@ const sheetLayerGroup =
 const neptunThreatLayerGroup =
   L.layerGroup().addTo(map);
 
+const mapaThreatLayerGroup =
+  L.layerGroup().addTo(map);
+
 const neptunRaionLayerGroup =
   L.layerGroup().addTo(map);
 
@@ -668,6 +717,8 @@ const neptunOblastLayerGroup =
 let sheetObjects = [];
 
 let neptunThreats = [];
+
+let mapaThreats = [];
 
 let neptunAlerts = [];
 
@@ -835,6 +886,11 @@ function saveOfflineState() {
           neptunThreats:
             Array.isArray(neptunThreats)
               ? neptunThreats
+              : [],
+
+          mapaThreats:
+            Array.isArray(mapaThreats)
+              ? mapaThreats
               : [],
 
           neptunAlerts:
@@ -1234,6 +1290,10 @@ async function restoreOfflineState() {
 
   }
 
+  if (Array.isArray(state.mapaThreats)) {
+    mapaThreats = state.mapaThreats;
+  }
+
   if (
     Array.isArray(
       state.neptunAlerts
@@ -1292,6 +1352,8 @@ async function restoreOfflineState() {
   renderNahrThreats();
 
   renderNeptunThreats();
+
+  renderMapaThreats();
 
   renderAlertZones();
 
@@ -1373,6 +1435,8 @@ window.addEventListener(
     
 
     loadNeptunThreats();
+
+    loadMapaThreats();
 
     loadNeptunGeoJSON();
 
@@ -1677,7 +1741,7 @@ function createEmojiIcon(
 
 function createNeptunThreatIcon(
   type,
-  rotate = 45
+  rotate = 0
 ) {
 
   const normalizedType =
@@ -1705,10 +1769,11 @@ function createNeptunThreatIcon(
 
   return L.divIcon({
 
-    className: "neptun-threat-icon",
+    className: normalizedType === "all" ?"neptun-threat-icon red": "neptun-threat-icon",
 
     html: `\n      <div
-        class="neptun-threat-marker"
+        class="neptun-threat-marker${normalizedType === "all" ?" redLevel":
+        ""}"
         style="transform: rotate(${rotation}deg);"
       >
         <img
@@ -1726,6 +1791,328 @@ function createNeptunThreatIcon(
     iconAnchor: [19, 19]
 
   });
+
+}
+
+/* =========================================================
+   MAPA.UA THREATS
+========================================================= */
+
+function getMapaThreatKind(threat) {
+  return normalizeType(
+    threat?.kind ||
+    threat?.subkind ||
+    threat?.type
+  );
+}
+
+function getMapaThreatTitle(threat) {
+  const kind = getMapaThreatKind(threat);
+
+  const titles = {
+    drone_piston: "БпЛА Shahed / поршневий",
+    drone_jet: "БпЛА реактивний",
+    missile_cruise: "Крилата ракета",
+    missile_ballistic: "Балістична ракета",
+    bomb_glide: "Керована авіабомба",
+    bomb: "Авіабомба"
+  };
+
+  if (titles[kind]) {
+    return titles[kind];
+  }
+
+  if (threat?.title) {
+    return String(threat.title);
+  }
+
+  if (threat?.kind) {
+    return String(threat.kind);
+  }
+
+  return "Повітряна загроза";
+}
+
+function getMapaThreatIconFile(threat) {
+  const kind = getMapaThreatKind(threat);
+
+  if (
+    kind === "drone_piston" ||
+    kind === "drone_jet" ||
+    kind === "uav" ||
+    kind === "drone"
+  ) {
+    return "uav.png";
+  }
+
+  return "all.png";
+}
+
+function createMapaThreatIcon(threat, rotate = 0) {
+  const kind = getMapaThreatKind(threat);
+  const iconFile =
+    getMapaThreatIconFile(threat);
+
+  const rotation =
+    Number.isFinite(Number(rotate))
+      ? Number(rotate)
+      : 0;
+
+  return L.divIcon({
+    className: kind === "drone_jet" ? "neptun-threat-icon redLevel": "neptun-threat-icon",
+
+    html: `
+      <div
+        class="neptun-threat-marker${kind === "drone_jet" ?" redLevel":
+        ""}"
+        style="transform: rotate(${rotation}deg);"
+      >
+        <img
+          src="./icon/${iconFile}"
+          alt=""
+          draggable="false"
+          style="width:46px;height:46px;object-fit:contain;display:block;"
+          onerror="this.onerror=null;this.src='./icon/all.png';"
+        >
+      </div>
+    `,
+
+    iconSize: [38, 38],
+    iconAnchor: [19, 19]
+  });
+}
+
+function renderMapaThreats() {
+  const openKey =
+    rememberMapaThreatPopup();
+
+  mapaThreatLayerGroup.clearLayers();
+
+  mapaThreats.forEach(
+    threat => {
+
+      const lat =
+        Number(threat?.lat);
+
+      const lng =
+        Number(
+          threat?.lon ??
+          threat?.lng
+        );
+
+      if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng)
+      ) {
+        return;
+      }
+
+      const marker =
+        L.marker(
+          [lat, lng],
+          {
+            icon:
+              createMapaThreatIcon(
+                threat,
+                threat?.heading
+              )
+          }
+        );
+
+      marker._threatPopupKey =
+        "mapa:" +
+        String(
+          threat?.id ??
+          (lat + ":" + lng)
+        );
+
+      marker._category =
+        MAPA_CATEGORY_THREAT;
+
+      marker._mapaThreat = true;
+
+      const title =
+        getMapaThreatTitle(threat);
+
+      const kind =
+        getMapaThreatKind(threat);
+
+      const speed =
+        threat?.speed_kmh != null
+          ? String(threat.speed_kmh) + " км/год"
+          : "Невідомо";
+
+      const heading =
+        threat?.heading != null
+          ? String(threat.heading) + "°"
+          : "Невідомо";
+
+      const destination =
+        threat?.title
+          ? String(threat.title)
+          : "";
+
+      const amount =
+        threat?.amount != null
+          ? String(threat.amount)
+          : "";
+
+      marker.bindPopup(
+        `
+        <div style="font-size:18px;line-height:1.35;">
+          <b>Помічена повітряна загроза</b>
+          ${
+            kind
+              ? `<br>Тип: ${title}`
+              : ""
+          }
+
+          <br>
+          Курс: ${heading}
+
+          ${
+            amount
+              ? `<br>${destination}`
+              : ""
+          }
+          
+        </div>
+
+        <div style="font-size:13px !important;line-height:1.35;">
+          <br>
+          Дані зібрано з
+          <a
+            style="font-size:13px !important;"
+            href="https://mapa.ua/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            MAPA.UA
+          </a>
+          <br><i style="font-size:13px !important;">P.S. : Ці дані від MAPA.UA від може буди недісним, тому викоритовуйте другі варіанти</i>
+        </div>
+        
+        `
+      );
+
+      marker.addTo(
+        mapaThreatLayerGroup
+      );
+    }
+  );
+
+  restoreMapaThreatPopup(openKey);
+  updateVisibility();
+}
+
+function rememberMapaThreatPopup() {
+  let key = null;
+
+  mapaThreatLayerGroup.eachLayer(
+    layer => {
+
+      if (
+        !key &&
+        typeof layer.isPopupOpen === "function" &&
+        layer.isPopupOpen()
+      ) {
+        key =
+          layer._threatPopupKey ??
+          null;
+      }
+
+    }
+  );
+
+  return key;
+}
+
+function restoreMapaThreatPopup(key) {
+  if (!key) {
+    return;
+  }
+
+  mapaThreatLayerGroup.eachLayer(
+    layer => {
+
+      if (
+        layer._threatPopupKey === key &&
+        typeof layer.openPopup === "function"
+      ) {
+        layer.openPopup();
+      }
+
+    }
+  );
+}
+
+async function loadMapaThreats() {
+
+  try {
+
+    const response =
+      await fetch(
+        getMapaThreatsURL(),
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "HTTP " +
+        response.status
+      );
+    }
+
+    const data =
+      await response.json();
+
+    const objects =
+      Array.isArray(data?.objects)
+        ? data.objects
+        : [];
+
+    mapaThreats =
+      objects.filter(
+        threat =>
+          threat &&
+          String(
+            threat.status || ""
+          ).toLowerCase() === "active" &&
+          Number.isFinite(
+            Number(threat.lat)
+          ) &&
+          Number.isFinite(
+            Number(
+              threat.lon ??
+              threat.lng
+            )
+          )
+      );
+
+    renderMapaThreats();
+
+    updateCategoryCounts();
+    updateStatus();
+
+    await saveOfflineState();
+
+    console.log(
+      "MAPA.UA:",
+      mapaThreats
+    );
+
+  } catch (error) {
+
+    console.error(
+      "MAPA.UA threats:",
+      error
+    );
+
+    updateStatus();
+
+  }
 
 }
 
@@ -2067,6 +2454,15 @@ function updateVisibility() {
   );
 
   /*
+   * MAPA UAV / threats
+   */
+  if (visibleCategories[MAPA_CATEGORY_THREAT]) {
+    if (!map.hasLayer(mapaThreatLayerGroup)) map.addLayer(mapaThreatLayerGroup);
+  } else {
+    if (map.hasLayer(mapaThreatLayerGroup)) map.removeLayer(mapaThreatLayerGroup);
+  }
+
+  /*
    * NEPTUN UAV / threats
    */
 
@@ -2230,6 +2626,13 @@ function updateCategoryCounts() {
 
     }
   );
+
+  /*
+   * MAPA UAV
+   */
+  mapaThreats.forEach(() => {
+    if (counts[MAPA_CATEGORY_THREAT] !== undefined) counts[MAPA_CATEGORY_THREAT]++;
+  });
 
   /*
    * NEPTUN air alerts
@@ -4011,6 +4414,7 @@ async function init() {
     loadNeptunGeoJSON(),
     loadNeptunAlerts(),
     loadNeptunThreats(),
+    loadMapaThreats(),
     
   ];
 
@@ -4066,6 +4470,15 @@ async function init() {
 
       }
 
+    },
+    5000
+  );
+
+  setInterval(
+    function() {
+      if (navigator.onLine) {
+        loadMapaThreats();
+      }
     },
     5000
   );
