@@ -1772,7 +1772,7 @@ function createNeptunThreatIcon(
     className: normalizedType === "all" ?"neptun-threat-icon red": "neptun-threat-icon",
 
     html: `\n      <div
-        class="neptun-threat-marker${normalizedType === "all" ?" redLevel":
+        class="neptun-threat-marker${iconFile === "all.png" ?" redLevel":
         ""}"
         style="transform: rotate(${rotation}deg);"
       >
@@ -1844,6 +1844,8 @@ function getMapaThreatIconFile(threat) {
   ) {
     return "uav.png";
   }
+  if(kind === "drone_fpv")
+    return "fpv.png"
 
   return "all.png";
 }
@@ -1858,14 +1860,15 @@ function createMapaThreatIcon(threat, rotate = 0) {
       ? Number(rotate)
       : 0;
 
+    
   return L.divIcon({
     className: kind === "drone_jet" ? "neptun-threat-icon redLevel": "neptun-threat-icon",
 
     html: `
       <div
-        class="neptun-threat-marker${kind === "drone_jet" ?" redLevel":
+        class="neptun-threat-marker${kind === "drone_jet" || iconFile ==="all.png" ?" redLevel":
         ""}"
-        style="transform: rotate(${rotation}deg);"
+        ${kind !== "drone_fpv"? `style=\"transform: rotate(${rotation}deg);\"` : ""}
       >
         <img
           src="./icon/${iconFile}"
@@ -1989,7 +1992,7 @@ function renderMapaThreats() {
           >
             MAPA.UA
           </a>
-          <br><i style="font-size:13px !important;">P.S. : Ці дані від MAPA.UA від може буди недісним, тому викоритовуйте другі варіанти</i>
+          <br><i style="font-size:13px !important;">P.S. : Ці дані від MAPA.UA від може буди недійсним, тому викоритовуйте другі варіанти</i>
         </div>
         
         `
