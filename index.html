@@ -20,447 +20,80 @@
 >
 
 <style>
-
-* {
-  box-sizing: border-box;
+:root{
+  color-scheme:dark;
+  --bg:#111820;
+  --panel:#18232e;
+  --panel2:#202d3a;
+  --line:rgba(202,220,235,.13);
+  --text:#edf4fa;
+  --muted:#9eafbd;
+  --accent:#4da3ff;
+  --danger:#ff4d5e;
 }
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  font-family: Arial, sans-serif;
-  background: #111;
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#0b1117;color:var(--text)}
+#map{position:absolute;inset:0;width:100%;height:100%;background:#101820}
+.leaflet-container{font:14px/1.45 Inter,system-ui,sans-serif;background:#101820}
+.leaflet-control-zoom{border:1px solid var(--line)!important;border-radius:10px!important;overflow:hidden;box-shadow:0 5px 20px #0005!important}
+.leaflet-control-zoom a{background:#18232e!important;color:#edf4fa!important;border-color:var(--line)!important}
+.leaflet-control-zoom a:hover{background:#263747!important}
+.leaflet-control-attribution{background:#101820d9!important;color:#9eafbd!important;border-radius:6px 0 0 0}
+.leaflet-control-attribution a{color:#8fc5ff!important}
+#panel{
+ position:absolute;z-index:1000;top:16px;left:16px;width:340px;max-width:calc(100vw - 32px);
+ max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;
+ background:rgba(19,29,39,.96);color:var(--text);border:1px solid var(--line);
+ border-radius:16px;padding:18px;box-shadow:0 14px 42px #0007;backdrop-filter:blur(16px);
+ transition:transform .24s ease,opacity .24s ease;
+ scrollbar-width:thin;scrollbar-color:#3a4c5b transparent
 }
-
-#map {
-  width: 100%;
-  height: 100%;
+#panel h2{font-size:17px;line-height:1.35;font-weight:750;letter-spacing:-.25px;margin:0 38px 16px 0;padding-bottom:14px;border-bottom:1px solid var(--line)}
+#categories{display:flex;flex-direction:column;gap:5px}
+.category{display:flex;align-items:center;gap:10px;padding:11px 10px;border:1px solid transparent;border-radius:10px;cursor:pointer;user-select:none;transition:background .15s,border-color .15s}
+.category:hover{background:#ffffff0a;border-color:#ffffff0c}
+.category:has(input:checked){background:#4da3ff12;border-color:#4da3ff25}
+.category input{appearance:none;flex:0 0 18px;width:18px;height:18px;margin:0;border:1.5px solid #718392;border-radius:5px;background:#111a23;cursor:pointer;display:grid;place-items:center}
+.category input:checked{background:var(--accent);border-color:var(--accent)}
+.category input:checked:after{content:"";width:8px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg);margin-top:-2px}
+.category-name{flex:1;font-size:13px;font-weight:600;color:#dce7ef;line-height:1.35}
+.category-count{min-width:28px;padding:4px 7px;border-radius:7px;background:#2a3947;color:#d8e6f1;font-size:11px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums}
+#status{margin-top:14px;padding:12px 12px;border:1px solid var(--line);border-radius:10px;background:#0f1821;color:var(--muted);font-size:11px;line-height:1.55}
+#alertBadge{margin-top:10px;padding:10px;border-radius:10px;background:#ff4d5e20;border:1px solid #ff4d5e80;color:#ff8994;font-weight:750;font-size:12px;text-align:center;animation:alertPulse 1.5s infinite}
+@keyframes alertPulse{50%{opacity:.58}}
+#panelToggle{position:absolute;z-index:1100;top:16px;left:16px;width:46px;height:46px;border:1px solid var(--line);border-radius:13px;background:#17232f;color:white;font-size:22px;display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 24px #0006;backdrop-filter:blur(12px)}
+#panelToggle:hover{background:#263747}
+#panelToggle:active{transform:scale(.96)}
+#panelClose{display:none;position:absolute;top:12px;right:12px;width:32px;height:32px;border:1px solid var(--line);border-radius:9px;background:#ffffff08;color:#dce7ef;font-size:17px;cursor:pointer}
+#panelClose:hover{background:#ffffff15}
+#neptunAttribution{position:absolute;z-index:1001;right:12px;bottom:12px;background:rgba(17,26,35,.9);color:#b6c7d5;border:1px solid var(--line);padding:7px 10px;border-radius:9px;font-size:11px;box-shadow:0 4px 14px #0004;backdrop-filter:blur(10px)}
+#neptunAttribution a{color:#a8d2ff;text-decoration:none}
+#neptunAttribution a:hover{text-decoration:underline}
+.emoji-marker{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#111820eF;border:2px solid white;font-size:19px;box-shadow:0 3px 12px #0009}
+.neptun-threat-marker,.mapa-threat-marker{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#f59e0bdc;border:2px solid #fff;box-shadow:0 0 14px #f59e0b99,0 3px 12px #0008;font-size:21px}
+.neptun-threat-marker.redLevel,.mapa-threat-marker.redLevel{background:#ef3340ed;box-shadow:0 0 22px #ef3340b8,0 3px 12px #0008}
+.neptun-alert-pulse{animation:neptunPulse 1.2s infinite}
+@keyframes neptunPulse{50%{filter:brightness(1.5);box-shadow:0 0 24px #f33,0 3px 10px #0008}}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#18232e;color:#edf4fa;box-shadow:0 8px 28px #0007}
+.leaflet-popup-content-wrapper{border:1px solid #ffffff1a;border-radius:12px}
+.leaflet-popup-content{font-size:14px!important;line-height:1.5!important;margin:14px 16px!important;max-width:min(340px,75vw)}
+.leaflet-popup-content b,.leaflet-popup-content strong{font-size:15px!important}
+.leaflet-popup-content a{font-size:13px!important;color:#8fc5ff!important}
+.leaflet-popup-close-button{color:#c7d5e0!important}
+@media(max-width:600px){
+ #panelToggle{display:flex}
+ #panel{top:10px;left:10px;width:310px;max-width:calc(100vw - 20px);max-height:calc(100vh - 20px);transform:translateX(calc(-100% - 20px));opacity:0;pointer-events:none;padding:48px 14px 14px;border-radius:14px}
+ #panel.panel-open{transform:translateX(0);opacity:1;pointer-events:auto}
+ #panelClose{display:block}
+ #panel h2{font-size:15px;margin-bottom:12px}
+ .category{padding:10px 8px}
+ .category-name{font-size:12px}
+ #neptunAttribution{right:6px;bottom:6px;font-size:10px;padding:5px 7px}
+ .leaflet-popup-content{max-width:calc(100vw - 90px);font-size:13px!important}
 }
-
-/* =========================
-   PANEL
-========================= */
-
-#panel {
-  position: absolute;
-  z-index: 1000;
-
-  top: 10px;
-  left: 10px;
-
-  width: 300px;
-  max-width: calc(100vw - 20px);
-
-  max-height: calc(100vh - 20px);
-  overflow-y: auto;
-
-  background: rgba(20, 20, 20, 0.94);
-  color: white;
-
-  border-radius: 12px;
-  padding: 12px;
-
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
-
-  backdrop-filter: blur(8px);
-
-  transition:
-    transform 0.25s ease,
-    opacity 0.25s ease;
-}
-
-#panel h2 {
-  margin: 0 0 10px 0;
-  font-size: 18px;
-}
-
-.category {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  padding: 7px 4px;
-  border-radius: 7px;
-
-  cursor: pointer;
-  user-select: none;
-}
-
-.category:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.category input {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.category-name {
-  flex: 1;
-  font-size: 14px;
-}
-
-.category-count {
-  min-width: 22px;
-  padding: 2px 6px;
-
-  border-radius: 10px;
-
-  background: rgba(255, 255, 255, 0.12);
-  color: #ddd;
-
-  font-size: 11px;
-  text-align: center;
-}
-
-#status {
-  margin-top: 9px;
-  padding-top: 8px;
-
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-
-  font-size: 11px;
-  color: #aaa;
-  line-height: 1.4;
-}
-
-#alertBadge {
-  display: none;
-
-  margin-top: 8px;
-  padding: 8px;
-
-  border-radius: 8px;
-
-  background: rgba(255, 0, 0, 0.22);
-  border: 1px solid rgba(255, 60, 60, 0.6);
-
-  color: #ff7777;
-
-  font-weight: bold;
-  font-size: 13px;
-
-  text-align: center;
-
-  animation: alertPulse 1.5s infinite;
-}
-
-@keyframes alertPulse {
-
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.55;
-  }
-
-  100% {
-    opacity: 1;
-  }
-
-}
-
-/* =========================
-   PANEL BUTTON
-========================= */
-
-#panelToggle {
-  position: absolute;
-  z-index: 1100;
-
-  top: 10px;
-  left: 10px;
-
-  width: 46px;
-  height: 46px;
-
-  border: none;
-  border-radius: 12px;
-
-  background: rgba(20, 20, 20, 0.94);
-  color: white;
-
-  font-size: 24px;
-  line-height: 46px;
-
-  text-align: center;
-
-  cursor: pointer;
-
-  box-shadow:
-    0 4px 15px rgba(0, 0, 0, 0.45);
-
-  backdrop-filter: blur(8px);
-
-  display: none;
-}
-
-#panelToggle:hover {
-  background: rgba(45, 45, 45, 0.96);
-}
-
-#panelToggle:active {
-  transform: scale(0.95);
-}
-
-/* =========================
-   CLOSE BUTTON
-========================= */
-
-#panelClose {
-  display: none;
-
-  position: absolute;
-
-  top: 8px;
-  right: 8px;
-
-  width: 34px;
-  height: 34px;
-
-  border: none;
-  border-radius: 8px;
-
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
-
-  font-size: 20px;
-
-  cursor: pointer;
-}
-
-#panelClose:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-/* =========================
-   NEPTUN ATTRIBUTION
-========================= */
-
-#neptunAttribution {
-  position: absolute;
-  z-index: 1001;
-
-  right: 10px;
-  bottom: 10px;
-
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-
-  padding: 5px 8px;
-  border-radius: 6px;
-
-  font-size: 11px;
-}
-
-#neptunAttribution a {
-  color: #fff;
-  text-decoration: none;
-}
-
-#neptunAttribution a:hover {
-  text-decoration: underline;
-}
-
-/* =========================
-   MARKERS
-========================= */
-
-.emoji-marker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 34px;
-  height: 34px;
-
-  border-radius: 50%;
-  
-  background: rgba(0, 0, 0, 0.78);
-  border: 2px solid white;
-
-  font-size: 20px;
-
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.neptun-threat-marker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 40px;
-  height: 40px;
-
-  border-radius: 50%;
-
-  background: rgba(255, 153, 0, 0.92);
-  border: 3px solid white;
-
-  font-size: 21px;
-
-  box-shadow:
-    0 0 12px rgba(255, 153, 0, 0.9),
-    0 3px 10px rgba(0, 0, 0, 0.6);
-}
-.neptun-threat-marker.redLevel{
-  background: rgba(255, 0, 0, 0.92);
-  box-shadow:
-    0 0 30px 5px rgba(255, 0, 0, 0.9),
-    0 3px 10px rgba(0, 0, 0, 0.6);
-}
-.mapa-threat-marker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 40px;
-  height: 40px;
-
-  border-radius: 50%;
-
-  background: rgba(255, 153, 0, 0.92);
-  border: 3px solid white;
-
-  font-size: 21px;
-
-  box-shadow:
-    0 0 12px rgba(255, 153, 0, 0.92),
-    0 3px 10px rgba(0, 0, 0, 0.6);
-}
-.mapa-threat-marker.redLevel {
-  background: rgba(255, 0, 0, 0.92);
-  box-shadow:
-    0 0 12px rgba(255, 0, 0, 0.9),
-    0 3px 10px rgba(0, 0, 0, 0.6);
-}
-.neptun-alert-pulse {
-  animation: neptunPulse 1.2s infinite;
-}
-
-@keyframes neptunPulse {
-
-  0% {
-    box-shadow:
-      0 0 5px rgba(255, 0, 0, 0.5),
-      0 3px 10px rgba(0, 0, 0, 0.5);
-  }
-
-  50% {
-    box-shadow:
-      0 0 24px rgba(255, 0, 0, 1),
-      0 3px 10px rgba(0, 0, 0, 0.5);
-  }
-
-  100% {
-    box-shadow:
-      0 0 5px rgb(99, 0, 0)
-      0 3px 10px rgba(0, 0, 0, 0.5);
-  }
-
-}
-
-/* =========================
-   MOBILE PANEL
-========================= */
-
-@media (max-width: 600px) {
-
-  #panelToggle {
-    display: block;
-  }
-
-  #panel {
-    top: 10px;
-    left: 10px;
-
-    width: 285px;
-    max-width: calc(100vw - 20px);
-
-    max-height: calc(100vh - 20px);
-
-    transform: translateX(
-      calc(-100% - 20px)
-    );
-
-    opacity: 0;
-
-    pointer-events: none;
-
-    padding-top: 45px;
-  }
-
-  #panel.panel-open {
-    transform: translateX(0);
-
-    opacity: 1;
-
-    pointer-events: auto;
-  }
-
-  #panelClose {
-    display: block;
-  }
-
-  #panel h2 {
-    font-size: 16px;
-  }
-
-  .category-name {
-    font-size: 13px;
-  }
-
-  #neptunAttribution {
-    right: 6px;
-    bottom: 6px;
-
-    font-size: 10px;
-
-    padding: 4px 6px;
-  }
-
-}
-
-/* =========================
-   VERY SMALL PHONES
-========================= */
-
-@media (max-width: 380px) {
-
-  #panel {
-    width: 270px;
-  }
-
-  #panelToggle {
-    width: 42px;
-    height: 42px;
-
-    line-height: 42px;
-
-    font-size: 22px;
-  }
-
-}
-
-
-/* Увеличенный шрифт во всех popup: в 2 раза */
-.leaflet-popup-content {
-  font-size: 32px !important;
-  line-height: 1.35 !important;
-}
-.leaflet-popup-content b,
-.leaflet-popup-content strong {
-  font-size: 32px !important;
-}
-.leaflet-popup-content a {
-  font-size: 32px !important;
+@media(max-width:380px){
+ #panel{width:280px}
+ #panelToggle{width:42px;height:42px}
 }
 </style>
 </head>
@@ -497,7 +130,7 @@ body {
     ✕
   </button>
 
-  <h2>🗺️ Мапа повітряних загроз — карта</h2>
+  <h2>🛰️ Мапа повітряних загроз</h2>
 
   <div id="categories"></div>
 
