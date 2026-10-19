@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>МПЗ — карта v2</title>
+<title>МПЗ — карта v3</title>
 
 <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -207,11 +207,11 @@ const MAPA_CATEGORY_THREAT = "3";
  * административных границ Украины.
  */
 
-const RAIONS_GEOJSON_URL =
-  "https://raw.githubusercontent.com/slawomirmatuszak/ukrainian_geodata/main/rayony.geojson";
-
-const OBLASTS_GEOJSON_URL =
-  "https://raw.githubusercontent.com/slawomirmatuszak/ukrainian_geodata/main/regiony.geojson";
+// Актуальні межі з OSM administrative boundaries (GeoJSON).
+// Ukraine.geojson містить межі областей; окремі файли областей — їхні райони.
+const GEOJSON_BASE_URL =
+  "https://cdn.jsdelivr.net/gh/darmat1/ukraine-geo-data@main/geodata";
+const OBLASTS_GEOJSON_URL = GEOJSON_BASE_URL + "/Ukraine.geojson";
 const OBLAST_GEOJSON_RU_URL = "https://raw.githubusercontent.com/datasets/geo-boundaries-world-1/master/countries/RUS.geojson"
 /* =========================================================
    КАТЕГОРІЇ
@@ -262,8 +262,10 @@ const map =
 
 // Стиль именно КАРТЫ: CARTO Voyager — чёткие дороги, населённые пункты
 // и физическая подложка без оформления сайта поверх карты.
+const CARTO_BASEMAP_KEY = "cb1_4p71_1_bc1eb1f9cdb46f6143101482";
+
 L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=" + CARTO_BASEMAP_KEY,
   {
     subdomains: "abcd",
     maxZoom: 20,
@@ -2437,16 +2439,17 @@ function getAlertStyle(
   const isYellow = level === "yellow" || level === "amber";
   const color = isYellow ? "#f5b82e" : "#ff3448";
 
-  // Стили именно GeoJSON-границ тревог: насыщенная заливка,
-  // контрастный контур и одинаково читаемый вид на любом масштабе.
+  // Чёткие административные контуры без тяжёлой заливки,
+  // из-за которой соседние полигоны выглядят как один кривой блок.
   return {
     color: isYellow ? "#ffd166" : "#ff5a68",
-    weight: isOblast ? 2.8 : 1.8,
-    opacity: 1,
+    weight: isOblast ? 2.4 : 1.25,
+    opacity: isOblast ? 0.98 : 0.92,
     lineCap: "round",
     lineJoin: "round",
     fillColor: color,
-    fillOpacity: isOblast ? 0.36 : 0.48,
+    fillOpacity: isOblast ? 0.10 : 0.34,
+    smoothFactor: 0.35,
     interactive: false
   };
 }
@@ -2455,148 +2458,95 @@ function getAlertStyle(
    LOAD NEPTUN GEOJSON
 ========================================================= */
 
-async function loadNeptunGeoJSON() {
+function geoNameToSlug(value) {
+  const transliteration = {
+    "а":"a","б":"b","в":"v","г":"h","ґ":"g","д":"d","е":"e","є":"ye",
+    "ж":"zh","з":"z","и":"y","і":"i","ї":"yi","й":"y","к":"k","л":"l",
+    "м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f",
+    "х":"kh","ц":"ts","ч":"ch","ш":"sh","щ":"shch","ь":"","ю":"yu","я":"ya",
+    "ы":"y","э":"e","ё":"yo","'":"","ʼ":"","’":"","`":""
+  };
+  return String(value || "")
+    .toLowerCase()
+    .split("")
+    .map(ch => transliteration[ch] !== undefined ? transliteration[ch] : ch)
+    .join("")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
 
-  try {
-
-    const [
-      raionResponse,
-      oblastResponse
-    ] = await Promise.all([
-
-      fetch(
-        RAIONS_GEOJSON_URL +
-        "?t=" +
-        Date.now(),
-        {
-          cache:
-            "no-store"
-        }
-      ),
-
-      fetch(
-        OBLASTS_GEOJSON_URL +
-        "?t=" +
-        Date.now(),
-        {
-          cache:
-            "no-store"
-        }
-      )
-
-    ]);
-
-    if (
-      !raionResponse.ok
-    ) {
-
-      throw new Error(
-        "Raions GeoJSON HTTP " +
-        raionResponse.status
-      );
-
-    }
-
-    if (
-      !oblastResponse.ok
-    ) {
-
-      throw new Error(
-        "Oblasts GeoJSON HTTP " +
-        oblastResponse.status
-      );
-
-    }
-
-    const newRaionsGeoJSON =
-      await raionResponse.json();
-
-    const newOblastsGeoJSON =
-      await oblastResponse.json();
-
-    /*
-     * Перевіряємо структуру,
-     * щоб не перезаписати кеш
-     * битим JSON.
-     */
-
-    if (
-      !newRaionsGeoJSON ||
-      typeof newRaionsGeoJSON !==
-        "object" ||
-      !Array.isArray(
-        newRaionsGeoJSON.features
-      )
-    ) {
-
-      throw new Error(
-        "Некоректний GeoJSON районів"
-      );
-
-    }
-
-    if (
-      !newOblastsGeoJSON ||
-      typeof newOblastsGeoJSON !==
-        "object" ||
-      !Array.isArray(
-        newOblastsGeoJSON.features
-      )
-    ) {
-
-      throw new Error(
-        "Некоректний GeoJSON областей"
-      );
-
-    }
-
-    /*
-     * Лише тепер замінюємо поточні
-     * GeoJSON.
-     */
-
-    raionsGeoJSON =
-      newRaionsGeoJSON;
-
-    oblastsGeoJSON =
-      newOblastsGeoJSON;
-
-    console.log(
-      "GeoJSON районів завантажено"
-    );
-
-    console.log(
-      "GeoJSON областей завантажено"
-    );
-
-    renderAlertZones();
-
-    /*
-     * GeoJSON успішно отримані —
-     * зберігаємо їх у кеш.
-     */
-
-    await saveOfflineState();
-
-    updateStatus();
-
-  } catch (error) {
-
-    console.error(
-      "GeoJSON NEPTUN:",
-      error
-    );
-
-    /*
-     * Старий GeoJSON залишається.
-     */
-
-    renderAlertZones();
-
-    updateStatus();
-
+async function fetchGeoJSON(url) {
+  const response = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error("GeoJSON HTTP " + response.status + ": " + url);
+  const data = await response.json();
+  if (!data || typeof data !== "object" || !Array.isArray(data.features)) {
+    throw new Error("Некорректный GeoJSON: " + url);
   }
+  return data;
+}
 
+async function loadNeptunGeoJSON() {
+  try {
+    // Сначала загружаем настоящие контуры областей Украины.
+    const newOblastsGeoJSON = await fetchGeoJSON(OBLASTS_GEOJSON_URL);
+
+    // Затем — отдельные наборы районов каждой области. Это заменяет старый
+    // общий файл с несовпадающими/устаревшими геометриями.
+    const oblastFeatures = newOblastsGeoJSON.features;
+    const districtResults = await Promise.allSettled(
+      oblastFeatures.map(async feature => {
+        const props = feature?.properties || {};
+        const name = typeof props.name === "string"
+          ? props.name
+          : (typeof props.NAME_1 === "string" ? props.NAME_1 : "");
+        if (!name) return [];
+        const slug = geoNameToSlug(name);
+        if (!slug) return [];
+        const districtGeoJSON = await fetchGeoJSON(GEOJSON_BASE_URL + "/" + slug + ".geojson");
+        return districtGeoJSON.features || [];
+      })
+    );
+
+    const allDistrictFeatures = [];
+    let successfulRegionFiles = 0;
+    districtResults.forEach(result => {
+      if (result.status === "fulfilled") {
+        successfulRegionFiles++;
+        allDistrictFeatures.push(...result.value);
+      } else {
+        console.warn("Не удалось загрузить GeoJSON районов области:", result.reason);
+      }
+    });
+
+    if (!newOblastsGeoJSON.features.length) {
+      throw new Error("GeoJSON областей не содержит features");
+    }
+    if (successfulRegionFiles === 0 || allDistrictFeatures.length === 0) {
+      throw new Error("Не удалось загрузить GeoJSON районов ни одной области");
+    }
+
+    raionsGeoJSON = {
+      type: "FeatureCollection",
+      features: allDistrictFeatures
+    };
+    oblastsGeoJSON = newOblastsGeoJSON;
+
+    console.log("GeoJSON областей загружено:", oblastsGeoJSON.features.length);
+    console.log("GeoJSON районов загружено:", raionsGeoJSON.features.length,
+      "из", successfulRegionFiles, "файлов областей");
+
+    renderAlertZones();
+    await saveOfflineState();
+    updateStatus();
+  } catch (error) {
+    console.error("GeoJSON NEPTUN:", error);
+    // Если новая геометрия не загрузилась, оставляем ранее сохранённый кеш.
+    renderAlertZones();
+    updateStatus();
+  }
 }
 
 /* =========================================================
