@@ -260,68 +260,23 @@ const map =
    TILE
 ========================================================= */
 
+// Стиль именно КАРТЫ: CARTO Voyager — чёткие дороги, населённые пункты
+// и физическая подложка без оформления сайта поверх карты.
 L.tileLayer(
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
   {
-    maxZoom: 19,
-    attribution:
-      "© OpenStreetMap contributors"
+    subdomains: "abcd",
+    maxZoom: 20,
+    attribution: "© OpenStreetMap contributors © CARTO"
   }
 ).addTo(map);
 
 /* =========================================================
-   МАСКА ЗАТЕМНЕНИЯ СТРАН (КРОМЕ УКРАИНЫ)
+   ПОЛИТИЧЕСКАЯ МАСКА СТРАН ОТКЛЮЧЕНА
 ========================================================= */
-
-// URL-адрес проверенного файла с геоданными границ всех стран мира
-const geojsonUrl = "https://cdn.jsdelivr.net/gh/datasets/geo-countries@main/data/countries.geojson";
-
-fetch(geojsonUrl)
-  .then(response => response.json())
-  .then(data => {
-    L.geoJSON(data, {
-      style: function (feature) {
-        // Проверяем, является ли текущая страна Украиной по ее ISO и имени в датасете
-        const props = feature.properties || {};
-        const countryName = String(
-          props.name ||
-          props.NAME ||
-          props.ADMIN ||
-          props.admin ||
-          ""
-        ).trim().toLowerCase();
-
-        const countryIso3 = String(
-          props["ISO3166-1-Alpha-3"] ||
-          props.ISO_A3 ||
-          props.iso_a3 ||
-          ""
-        ).trim().toUpperCase();
-
-        const isUkraine =
-          countryIso3 === "UKR" ||
-          countryName === "ukraine" ||
-          countryName === "україна" ||
-          countryName === "украина";
-
-        if (isUkraine) {
-          return {
-            fillOpacity: 0,       // Украина остается полностью прозрачной (видна обычная карта)
-            color: "transparent", // Скрываем внешнюю программную границу (будет видна родная граница с тайлов)
-            weight: 0
-          };
-        } else {
-          return {
-            fillColor: "#121212", // Цвет затемнения для остальных стран (можно заменить на #000000)
-            fillOpacity: 0.75,    // Плотность маски (0.8 — темнее, 0.5 — светлее)
-            color: "#2c2c2c",     // Цвет линий границ между другими странами
-            weight: 1             // Толщина линий границ других стран
-          };
-        }
-      }
-    }).addTo(map);
-  })
-  .catch(error => console.error("Ошибка загрузки границ стран:", error));
+// Не накладываем поверх тайлов полигоны стран: в некоторых наборах
+// мировых границ Крым ошибочно попадает в серую маску. Подложка теперь
+// единая по всей карте, а активные тревоги выделяются отдельными GeoJSON-полигонами.
 
 
 /* =========================================================
@@ -1865,13 +1820,22 @@ function renderSheetObjects() {
                   category.color,
 
                 weight:
-                  3,
+                  2.5,
+
+                opacity:
+                  0.98,
 
                 fillColor:
                   category.color,
 
                 fillOpacity:
-                  0.18
+                  0.32,
+
+                lineCap:
+                  "round",
+
+                lineJoin:
+                  "round"
 
               }
 
@@ -2469,101 +2433,22 @@ function getAlertStyle(
   alert,
   isOblast
 ) {
+  const level = String(alert?.level || "red").toLowerCase();
+  const isYellow = level === "yellow" || level === "amber";
+  const color = isYellow ? "#f5b82e" : "#ff3448";
 
-  const level =
-    String(
-      alert?.level || ""
-    ).toLowerCase();
-
-  /*
-   * RED = active official red alert
-   */
-
-  if (
-    level === "red"
-  ) {
-
-    return {
-
-      color:
-        "#cc0000",
-
-      weight:
-        isOblast
-          ? 5
-          : 3,
-
-      opacity:
-        1,
-
-      fillColor:
-        "#ff0000",
-
-      fillOpacity:
-        isOblast
-          ? 0.65
-          : 0.78
-
-    };
-
-  }
-
-  /*
-   * YELLOW = yellow alert
-   */
-
-  if (
-    level === "yellow"
-  ) {
-
-    return {
-
-      color:
-        "#cc9900",
-
-      weight:
-        isOblast
-          ? 5
-          : 3,
-
-      opacity:
-        1,
-
-      fillColor:
-        "#ffcc00",
-
-      fillOpacity:
-        isOblast
-          ? 0.65
-          : 0.78
-
-    };
-
-  }
-
-  /*
-   * fallback
-   */
-
+  // Стили именно GeoJSON-границ тревог: насыщенная заливка,
+  // контрастный контур и одинаково читаемый вид на любом масштабе.
   return {
-
-    color:
-      "#ff0000",
-
-    weight:
-      3,
-
-    opacity:
-      1,
-
-    fillColor:
-      "#ff0000",
-
-    fillOpacity:
-      0.18
-
+    color: isYellow ? "#ffd166" : "#ff5a68",
+    weight: isOblast ? 2.8 : 1.8,
+    opacity: 1,
+    lineCap: "round",
+    lineJoin: "round",
+    fillColor: color,
+    fillOpacity: isOblast ? 0.36 : 0.48,
+    interactive: false
   };
-
 }
 
 /* =========================================================
