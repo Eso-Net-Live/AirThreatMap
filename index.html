@@ -92,6 +92,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 .mapHistory__day h3{font-size:12px;color:#aab3bd;border-bottom:1px solid #ffffff20;padding-bottom:10px;margin:10px 0 14px}
 .mapHistoryCard{padding:16px 17px;margin:0 0 10px;border:1px solid #ffffff20;border-radius:10px;background:#282d33}
 .mapHistoryCard.is-yellow{background:#4b4229;border-color:#a18b46}
+.mapHistoryCard.is-red{background:#482b32;border-color:#b83b4b}
+.mapHistoryCard.is-neutral{background:#28323b;border-color:#566575}
+.mapHistoryCard__reason{font-size:12px;color:#d0d9e1;margin-top:8px;line-height:1.45}
+.mapHistoryCard__icon{width:28px;height:28px;object-fit:contain;flex:none}
 .mapHistoryCard__top,.mapHistoryCard__bottom,.mapHistoryCard__identity{display:flex;align-items:center;gap:10px}
 .mapHistoryCard__top,.mapHistoryCard__bottom{justify-content:space-between}
 .mapHistoryCard__identity img{width:28px;height:28px;flex:none}
@@ -129,7 +133,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 <div id="map"></div>
 <dialog class="mapHistory" id="mapHistory" aria-labelledby="map-history-title" aria-modal="true">
   <header class="mapHistory__head">
-    <div><span>Історія тривог</span><h2 id="map-history-title">Область</h2></div>
+    <div><span>Теперішні загрози</span><h2 id="map-history-title">Область</h2></div>
     <button type="button" class="mapHistory__close" id="mapHistoryClose" aria-label="Закрити історію">×</button>
   </header>
   <div class="mapHistory__body" id="mapHistoryBody" aria-live="polite"></div>
@@ -2678,10 +2682,13 @@ async function loadNeptunGeoJSON() {
 
 
 /* =========================================================
-   AREA CLICK + LIGHTWEIGHT LOCAL ALERT HISTORY
-   Stores observed state transitions in this browser only.
+   CURRENT THREATS BY OBLAST
+   Data source: AirThreatMap alarm.json
 ========================================================= */
-const ALERT_HISTORY_KEY = "MapaPodiyUA_alertHistory_v1";
+const CUSTOM_THREATS_URL = "https://eso-net-live.github.io/AirThreatMap/alarm.json";
+const CUSTOM_THREATS_CACHE_KEY = "MapaPodiyUA_customThreats_v1";
+let customThreats = [];
+let customThreatsUpdatedAt = 0;
 const mapHistoryDialog = document.getElementById("mapHistory");
 const mapHistoryBody = document.getElementById("mapHistoryBody");
 const mapHistoryTitle = document.getElementById("map-history-title");
@@ -2692,63 +2699,107 @@ mapHistoryDialog.addEventListener("click", event => {
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && mapHistoryDialog.open) mapHistoryDialog.close();
 });
-function readAlertHistory() {
-  try { const v = JSON.parse(localStorage.getItem(ALERT_HISTORY_KEY) || "[]"); return Array.isArray(v) ? v : []; }
-  catch (_) { return []; }
+function safeThreatText(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, ch => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+  }[ch]));
 }
-function rememberAlertSnapshot() {
-  const now = Date.now(), history = readAlertHistory();
-  const active = [];
-  const collect = (items, kind) => (items || []).forEach(a => {
-    const name = String(a?.name || a?.region || a?.title || "").trim();
-    if (!name) return;
-    active.push({key: kind + ":" + normalizeName(name), name, level: String(a?.level || "red").toLowerCase(), startedAt: Number(a?.startedAt || a?.startTime || a?.start_time || 0) || now, active: true});
-  });
-  collect(neptunAlerts, "district"); collect(neptunAlertOblasts, "oblast");
-  const currentKeys = new Set(active.map(a => a.key));
-  const previousActive = new Map(history.filter(x => x.active).map(x => [x.key, x]));
-  const next = history.map(x => x.active && !currentKeys.has(x.key) ? {...x, active:false, endedAt:now} : x);
-  active.forEach(a => {
-    const old = previousActive.get(a.key);
-    if (old) {
-      const i = next.findIndex(x => x.key === a.key && x.active);
-      if (i >= 0) next[i] = {...next[i], level:a.level};
-    } else next.unshift({...a, observedAt:now});
-  });
-  try { localStorage.setItem(ALERT_HISTORY_KEY, JSON.stringify(next.slice(0,500))); } catch (_) {}
+function threatLevelInfo(level) {
+  const n = Number(level);
+  if (Number.isFinite(n)) {
+    if (n >= 5) return {kind:"red", label:"Червоний рівень"};
+    if (n >= 3) return {kind:"yellow", label:"Жовтий рівень"};
+    return {kind:"neutral", label:"Інший статус"};
+  }
+  const value = String(level || "").toLowerCase();
+  if (/red|червон/.test(value)) return {kind:"red", label:"Червоний рівень"};
+  if (/yellow|amber|жовт/.test(value)) return {kind:"yellow", label:"Жовтий рівень"};
+  return {kind:"neutral", label:value ? "Рівень: " + String(level) : "Рівень не вказано"};
 }
-function formatHistoryTime(ms) {
-  return new Date(ms).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"});
+function normalizeAreaName(value) {
+  return normalizeName(String(value || "")
+    .replace(/\b(область|обл\.|район|районі)\b/gi, "")
+    .replace(/[^а-яіїєґa-z0-9]/gi, ""));
+}
+function threatsForOblast(oblastName) {
+  const needle = normalizeAreaName(oblastName);
+  return customThreats.filter(item => {
+    const target = normalizeAreaName(item.oblast || item.name || "");
+    return target && (target === needle || target.includes(needle) || needle.includes(target));
+  });
+}
+function formatThreatSince(value) {
+  if (!value || value === "-") return "Час початку не вказано";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return safeThreatText(value);
+  return date.toLocaleString("uk-UA", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
 }
 function showAreaHistory(name) {
   mapHistoryTitle.textContent = name;
-  const needle = normalizeName(name);
-  const items = readAlertHistory().filter(x => normalizeName(x.name) === needle || needle.includes(normalizeName(x.name)) || normalizeName(x.name).includes(needle))
-    .sort((a,b) => (b.observedAt || b.startedAt || 0) - (a.observedAt || a.startedAt || 0)).slice(0,60);
+  const items = threatsForOblast(name);
   if (!items.length) {
-    mapHistoryBody.innerHTML = '<div class="mapHistory__empty">Для цієї області ще немає записів у локальній історії. Історія починає накопичуватися після відкриття цієї сторінки й отримання даних.</div><p class="history-hint">Це локальний журнал змін, а не повний архів сервісу. Попередні події, які сталися до першого відкриття сторінки, тут не з’являться.</p>';
+    mapHistoryBody.innerHTML = '<div class="mapHistory__empty">У списку alarm.json зараз немає записів для цієї області або дані ще не завантажені.</div><p class="history-hint">Дані надходять з AirThreatMap alarm.json. Перевіряй офіційні сповіщення та сигнали тривоги.</p>';
   } else {
-    const groups = new Map();
-    items.forEach(x => { const d = new Date(x.observedAt || x.startedAt || Date.now()).toLocaleDateString("uk-UA",{day:"numeric",month:"long",year:"numeric"}); if(!groups.has(d)) groups.set(d,[]); groups.get(d).push(x); });
-    mapHistoryBody.innerHTML = [...groups].map(([date, rows]) => '<section class="mapHistory__day"><h3>'+date+'</h3>'+rows.map(x => {
-      const yellow = /yellow|amber|жовт/i.test(x.level);
-      const start = x.startedAt || x.observedAt || Date.now();
-      const end = x.active ? "триває" : formatHistoryTime(x.endedAt || x.observedAt || start);
-      const duration = x.active ? Math.max(1,Math.round((Date.now()-start)/60000)) : Math.max(1,Math.round(((x.endedAt||start)-start)/60000));
-      return '<article class="mapHistoryCard '+(yellow?'is-yellow':'')+'"><div class="mapHistoryCard__top"><div class="mapHistoryCard__identity"><img src="'+(yellow?'https://map.ukrainealarm.com/images/content/icon_air_yellow.svg':'https://map.ukrainealarm.com/images/content/icon_air.svg')+'" alt=""><div><strong>Повітряна тривога</strong><span class="mapHistoryCard__level">'+(yellow?'Жовтий рівень':'Червоний рівень')+'</span><span class="mapHistoryCard__region">'+x.name+'</span></div></div>'+(x.active?'<span class="mapHistoryCard__ongoing">Триває</span>':'')+'</div><div class="mapHistoryCard__bottom"><span>'+formatHistoryTime(start)+' — '+end+'</span><span class="mapHistoryCard__duration">'+(duration>=60?Math.floor(duration/60)+' год '+duration%60+' хв':duration+' хв')+'</span></div></article>';
-    }).join('')+'</section>').join('')+'<p class="history-hint">Локальна історія цього браузера. Вона не містить подій до першого запуску сторінки.</p>';
+    mapHistoryBody.innerHTML = '<section class="mapHistory__day"><h3>Теперішні загрози · ' + items.length + '</h3>' +
+      items.map(item => {
+        const level = threatLevelInfo(item.level);
+        const icon = /^https?:\/\//i.test(String(item.icon || "")) ? safeThreatText(item.icon) : "";
+        const title = safeThreatText(item.name || "Повітряна загроза");
+        const oblast = safeThreatText(item.oblast || name);
+        const place = safeThreatText(item.place || item.location || item.region || "");
+        const reason = safeThreatText(item.reasons || "Причину не вказано");
+        return '<article class="mapHistoryCard is-' + level.kind + '">' +
+          '<div class="mapHistoryCard__top"><div class="mapHistoryCard__identity">' +
+          (icon ? '<img class="mapHistoryCard__icon" src="' + icon + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '') +
+          '<div><strong>' + title + '</strong><span class="mapHistoryCard__level">' + level.label + ' · level ' + safeThreatText(item.level ?? "?") + '</span>' +
+          '<span class="mapHistoryCard__region">Область: ' + oblast + '</span>' +
+          (place ? '<span class="mapHistoryCard__region">Місце: ' + place + '</span>' : '') +
+          '</div></div><span class="mapHistoryCard__ongoing">Активно в списку</span></div>' +
+          '<div class="mapHistoryCard__reason">Причина: ' + reason + '</div>' +
+          '<div class="mapHistoryCard__bottom"><span>Початок: ' + formatThreatSince(item.since) + '</span></div></article>';
+      }).join("") + '</section><p class="history-hint">Оновлено: ' +
+      (customThreatsUpdatedAt ? new Date(customThreatsUpdatedAt).toLocaleTimeString("uk-UA", {hour:"2-digit", minute:"2-digit"}) : "невідомо") +
+      '. Рівень 3–4 — жовтий, рівень 5 і вище — червоний.</p>';
   }
   if (!mapHistoryDialog.open) mapHistoryDialog.showModal();
 }
 function attachAreaHistory(layer, feature) {
   const props = feature?.properties || {};
-  const name = String(props.name || props.NAME_1 || props.NAME_2 || props.shapeName || props.admin1Name || props.NAME || "Область");
+  const name = String(props.name || props.NAME_1 || props.shapeName || props.admin1Name || props.NAME || "Область");
+  // Відкривати загрози лише для областей, не для районів.
   layer.eachLayer?.(part => {
     if (part.setStyle) part.setStyle({interactive:true, fillOpacity:0.025, opacity:0.8, weight:1.3, color:"#8da8c0"});
-    part.on?.("click", event => { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); showAreaHistory(name); });
+    part.on?.("click", event => {
+      if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+      showAreaHistory(name);
+    });
     part.on?.("mouseover", () => part.setStyle?.({weight:2.2, color:"#75baff", fillOpacity:0.09}));
     part.on?.("mouseout", () => part.setStyle?.({weight:1.3, color:"#8da8c0", fillOpacity:0.025}));
   });
+}
+async function loadCustomThreats() {
+  try {
+    const response = await fetch(CUSTOM_THREATS_URL + "?t=" + Date.now(), {cache:"no-store"});
+    if (!response.ok) throw new Error("alarm.json HTTP " + response.status);
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error("alarm.json має бути масивом");
+    customThreats = data.filter(item => item && typeof item === "object" && (item.name || item.oblast));
+    customThreatsUpdatedAt = Date.now();
+    try { localStorage.setItem(CUSTOM_THREATS_CACHE_KEY, JSON.stringify({updatedAt:customThreatsUpdatedAt, items:customThreats})); } catch (_) {}
+    if (mapHistoryDialog.open) showAreaHistory(mapHistoryTitle.textContent);
+    console.log("AirThreatMap custom threats:", customThreats.length);
+  } catch (error) {
+    console.warn("Не вдалося завантажити кастомні загрози:", error);
+    if (!customThreats.length) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(CUSTOM_THREATS_CACHE_KEY) || "null");
+        if (Array.isArray(cached?.items)) {
+          customThreats = cached.items;
+          customThreatsUpdatedAt = Number(cached.updatedAt) || 0;
+        }
+      } catch (_) {}
+    }
+  }
 }
 
 function renderAlertZones() {
@@ -2935,7 +2986,7 @@ function renderAlertZones() {
     if (window.areaHistoryHitLayer) window.areaHistoryHitLayer.clearLayers();
     else window.areaHistoryHitLayer = L.layerGroup().addTo(map);
     const hitLayer = window.areaHistoryHitLayer;
-    [oblastsGeoJSON, raionsGeoJSON].forEach(collection => {
+    [oblastsGeoJSON].forEach(collection => {
       if (!collection || !Array.isArray(collection.features)) return;
       collection.features.forEach(feature => {
         const hit = L.geoJSON(feature, {style:{color:"#8da8c0",weight:1.1,opacity:0.55,fillColor:"#8da8c0",fillOpacity:0.001},interactive:true});
@@ -4102,7 +4153,7 @@ async function init() {
     loadNeptunAlerts(),
     loadNeptunThreats(),
     loadMapaThreats(),
-    
+    loadCustomThreats()
   ];
 
   await Promise.allSettled(
@@ -4169,6 +4220,8 @@ async function init() {
     },
     15000
   );
+
+  setInterval(function() { if (navigator.onLine) loadCustomThreats(); }, 60000);
 
   /*
    * Оновлюємо статус кешу періодично,
