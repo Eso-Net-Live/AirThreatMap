@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>МПЗ — карта v3</title>
+<title>Мапа повітряних тривог України</title>
 
 <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -251,35 +251,106 @@ const categories = {
    MAP
 ========================================================= */
 
+const UKRAINE_VIEW_BOUNDS = L.latLngBounds([[44.0, 21.0], [53.0, 41.0]]);
+
 const map =
   L.map("map", {
-    zoomControl: true
-  }).setView([47.60, 32.25], 7);
+    zoomControl: true,
+    maxBounds: UKRAINE_VIEW_BOUNDS,
+    maxBoundsViscosity: 0.92,
+    minZoom: 6
+  }).setView([48.38, 31.17], 6);
 
 /* =========================================================
    TILE
 ========================================================= */
 
-// Стиль именно КАРТЫ: CARTO Voyager — чёткие дороги, населённые пункты
-// и физическая подложка без оформления сайта поверх карты.
+// Темна картографічна підкладка CARTO.
 const CARTO_BASEMAP_KEY = "cb1_4p71_1_bc1eb1f9cdb46f6143101482";
+const CARTO_DARK_TILES = "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=" + CARTO_BASEMAP_KEY;
 
-L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=" + CARTO_BASEMAP_KEY,
-  {
-    subdomains: "abcd",
-    maxZoom: 20,
-    attribution: "© OpenStreetMap contributors © CARTO"
-  }
-).addTo(map);
+L.tileLayer(CARTO_DARK_TILES, {
+  subdomains: "abcd",
+  maxZoom: 20,
+  attribution: "© OpenStreetMap contributors © CARTO"
+}).addTo(map);
 
 /* =========================================================
-   ПОЛИТИЧЕСКАЯ МАСКА СТРАН ОТКЛЮЧЕНА
+   МАСКА: ПОЗА МЕЖАМИ УКРАЇНИ — ТЕМНЕ ПОЛЕ
 ========================================================= */
-// Не накладываем поверх тайлов полигоны стран: в некоторых наборах
-// мировых границ Крым ошибочно попадает в серую маску. Подложка теперь
-// единая по всей карте, а активные тревоги выделяются отдельными GeoJSON-полигонами.
+// Перевіряємо ISO-код та назви країни, щоб не затемнити Крим окремо від України.
+const WORLD_COUNTRIES_GEOJSON_URL = "https://cdn.jsdelivr.net/gh/datasets/geo-countries@main/data/countries.geojson";
+const ukraineOutlineLayer = L.layerGroup().addTo(map);
 
+fetch(WORLD_COUNTRIES_GEOJSON_URL)
+  .then(response => {
+    if (!response.ok) throw new Error("Не вдалося завантажити межі країн");
+    return response.json();
+  })
+  .then(data => {
+    const features = Array.isArray(data.features) ? data.features : [];
+    const isUkraineFeature = feature => {
+      const props = feature && feature.properties ? feature.properties : {};
+      const iso = String(props["ISO3166-1-Alpha-3"] || props.ISO_A3 || props.iso_a3 || props.ADM0_A3 || "").trim().toUpperCase();
+      const name = String(props.name || props.NAME || props.ADMIN || props.admin || props.NAME_EN || "").trim().toLowerCase();
+      return iso === "UKR" || ["ukraine", "україна", "украина"].includes(name);
+    };
+    const ukraineFeature = features.find(isUkraineFeature);
+    const isRussiaFeature = feature => {
+      const props = feature && feature.properties ? feature.properties : {};
+      const iso = String(props["ISO3166-1-Alpha-3"] || props.ISO_A3 || props.iso_a3 || props.ADM0_A3 || "").trim().toUpperCase();
+      const name = String(props.name || props.NAME || props.ADMIN || props.admin || props.NAME_EN || "").trim().toLowerCase();
+      return iso === "RUS" || ["russia", "russian federation", "росія", "россия"].includes(name);
+    };
+
+    // У деяких світових наборах Крим помилково входить до геометрії Росії.
+    // Якщо він окремим полігоном у MultiPolygon, прибираємо саме цей полігон з маски.
+    const otherCountries = features
+      .filter(feature => !isUkraineFeature(feature))
+      .map(feature => {
+        if (!isRussiaFeature(feature) || !feature.geometry) return feature;
+        const geometry = feature.geometry;
+        const isCrimeaPolygon = ringSet => {
+          const ring = Array.isArray(ringSet) && Array.isArray(ringSet[0]) ? ringSet[0] : ringSet;
+          if (!Array.isArray(ring) || !ring.length) return false;
+          const xs = ring.map(point => point[0]).filter(Number.isFinite);
+          const ys = ring.map(point => point[1]).filter(Number.isFinite);
+          if (!xs.length || !ys.length) return false;
+          const minX = Math.min(...xs), maxX = Math.max(...xs);
+          const minY = Math.min(...ys), maxY = Math.max(...ys);
+          // Кримський півострів: полігон має повністю вкладатися в цей географічний діапазон.
+          return minX >= 32.0 && maxX <= 37.2 && minY >= 43.8 && maxY <= 47.0;
+        };
+        if (geometry.type === "MultiPolygon" && Array.isArray(geometry.coordinates)) {
+          const coordinates = geometry.coordinates.filter(poly => !isCrimeaPolygon(poly));
+          return { ...feature, geometry: { ...geometry, coordinates } };
+        }
+        if (geometry.type === "Polygon" && isCrimeaPolygon(geometry.coordinates)) {
+          return null;
+        }
+        return feature;
+      })
+      .filter(Boolean);
+
+    // Інші держави затемнені. Російська геометрія не повинна накривати Крим.
+    L.geoJSON({ type: "FeatureCollection", features: otherCountries }, {
+      interactive: false,
+      style: {
+        color: "#090d13", weight: 1, opacity: 0.95,
+        fillColor: "#05080d", fillOpacity: 0.94
+      }
+    }).addTo(map);
+
+    if (ukraineFeature) {
+      L.geoJSON(ukraineFeature, {
+        interactive: false,
+        style: { color: "#62a9ff", weight: 2, opacity: 0.95, fillOpacity: 0 }
+      }).addTo(ukraineOutlineLayer);
+    } else {
+      console.warn("У GeoJSON не знайдено Україну за ISO-кодом UKR");
+    }
+  })
+  .catch(error => console.warn("Маска меж України недоступна:", error));
 
 /* =========================================================
    LAYERS
@@ -2483,7 +2554,7 @@ async function fetchGeoJSON(url) {
   if (!response.ok) throw new Error("GeoJSON HTTP " + response.status + ": " + url);
   const data = await response.json();
   if (!data || typeof data !== "object" || !Array.isArray(data.features)) {
-    throw new Error("Некорректный GeoJSON: " + url);
+    throw new Error("Некоректний GeoJSON: " + url);
   }
   return data;
 }
@@ -2517,15 +2588,15 @@ async function loadNeptunGeoJSON() {
         successfulRegionFiles++;
         allDistrictFeatures.push(...result.value);
       } else {
-        console.warn("Не удалось загрузить GeoJSON районов области:", result.reason);
+        console.warn("Не вдалося завантажити GeoJSON районів області:", result.reason);
       }
     });
 
     if (!newOblastsGeoJSON.features.length) {
-      throw new Error("GeoJSON областей не содержит features");
+      throw new Error("GeoJSON областей не містить об’єктів");
     }
     if (successfulRegionFiles === 0 || allDistrictFeatures.length === 0) {
-      throw new Error("Не удалось загрузить GeoJSON районов ни одной области");
+      throw new Error("Не вдалося завантажити GeoJSON районів жодної області");
     }
 
     raionsGeoJSON = {
@@ -2534,7 +2605,26 @@ async function loadNeptunGeoJSON() {
     };
     oblastsGeoJSON = newOblastsGeoJSON;
 
-    console.log("GeoJSON областей загружено:", oblastsGeoJSON.features.length);
+    // Окремо підсвічуємо межу АР Крим та Севастополя незалежно від наявності тривоги.
+    // Шар містить лише контури, тому не перекриває кольори актуальних тривог.
+    if (window.crimeaOutlineLayer) {
+      window.crimeaOutlineLayer.clearLayers();
+    } else {
+      window.crimeaOutlineLayer = L.layerGroup().addTo(map);
+    }
+    const isCrimeaOrSevastopol = feature => {
+      const p = feature && feature.properties ? feature.properties : {};
+      const n = String(p.name || p.NAME_1 || p.NAME || p.admin1Name || p.shapeName || "").toLowerCase();
+      return n.includes("крим") || n.includes("crimea") || n.includes("sevastopol") || n.includes("севастоп") || n.includes("севастополь");
+    };
+    newOblastsGeoJSON.features.filter(isCrimeaOrSevastopol).forEach(feature => {
+      L.geoJSON(feature, {
+        interactive: false,
+        style: { color: "#65c7ff", weight: 2.8, opacity: 1, fillOpacity: 0 }
+      }).addTo(window.crimeaOutlineLayer);
+    });
+
+    console.log("GeoJSON областей завантажено:", oblastsGeoJSON.features.length);
     console.log("GeoJSON районов загружено:", raionsGeoJSON.features.length,
       "из", successfulRegionFiles, "файлов областей");
 
