@@ -59,7 +59,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 .category-name{flex:1;font-size:13px;font-weight:600;color:#dce7ef;line-height:1.35}
 .category-count{min-width:28px;padding:4px 7px;border-radius:7px;background:#2a3947;color:#d8e6f1;font-size:11px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums}
 #status{margin-top:14px;padding:12px 12px;border:1px solid var(--line);border-radius:10px;background:#0f1821;color:var(--muted);font-size:11px;line-height:1.55}
-#alertBadge{margin-top:10px;padding:10px;border-radius:10px;background:#ff4d5e20;border:1px solid #ff4d5e80;color:#ff8994;font-weight:750;font-size:12px;text-align:center;animation:alertPulse 1.5s infinite}
+#alertBadge{margin-top:10px;padding:10px;border-radius:10px;background:#ff4d5e20;border:1px solid #ff4d5e80;color:#ff8994;font-weight:750;font-size:12px;text-align:center;animation:alertPulse 3s infinite}
 @keyframes alertPulse{50%{opacity:.58}}
 #panelToggle{position:absolute;z-index:1100;top:16px;left:16px;width:46px;height:46px;border:1px solid var(--line);border-radius:13px;background:#17232f;color:white;font-size:22px;display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 24px #0006;backdrop-filter:blur(12px)}
 #panelToggle:hover{background:#263747}
@@ -80,6 +80,32 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 .leaflet-popup-content b,.leaflet-popup-content strong{font-size:15px!important}
 .leaflet-popup-content a{font-size:13px!important;color:#8fc5ff!important}
 .leaflet-popup-close-button{color:#c7d5e0!important}
+
+/* Alert history dialog */
+.mapHistory{width:min(680px,calc(100vw - 28px));max-width:none;max-height:min(88vh,760px);padding:0;border:1px solid #ffffff24;border-radius:14px;background:#282d33;color:#edf0f4;box-shadow:0 24px 80px #000a;overflow:hidden}
+.mapHistory::backdrop{background:#070b10b8;backdrop-filter:blur(3px)}
+.mapHistory__head{display:flex;justify-content:space-between;align-items:center;padding:24px 28px 18px;border-bottom:1px solid #ffffff20}
+.mapHistory__head span{font-size:12px;color:#aab3bd;font-weight:700}
+.mapHistory__head h2{margin:5px 0 0;font-size:25px;line-height:1.2}
+.mapHistory__close{width:44px;height:44px;border:1px solid #ffffff24;border-radius:50%;background:transparent;color:#f4f6f8;font-size:28px;cursor:pointer}
+.mapHistory__body{padding:18px 28px 24px;overflow:auto;max-height:calc(88vh - 100px);overscroll-behavior:contain}
+.mapHistory__day h3{font-size:12px;color:#aab3bd;border-bottom:1px solid #ffffff20;padding-bottom:10px;margin:10px 0 14px}
+.mapHistoryCard{padding:16px 17px;margin:0 0 10px;border:1px solid #ffffff20;border-radius:10px;background:#282d33}
+.mapHistoryCard.is-yellow{background:#4b4229;border-color:#a18b46}
+.mapHistoryCard__top,.mapHistoryCard__bottom,.mapHistoryCard__identity{display:flex;align-items:center;gap:10px}
+.mapHistoryCard__top,.mapHistoryCard__bottom{justify-content:space-between}
+.mapHistoryCard__identity img{width:28px;height:28px;flex:none}
+.mapHistoryCard__identity>div{display:flex;flex-direction:column;gap:3px}
+.mapHistoryCard__identity strong{font-size:14px}
+.mapHistoryCard__level{font-size:12px;color:#f2c94c;font-weight:700}
+.mapHistoryCard__region,.mapHistoryCard__duration{font-size:12px;color:#aab3bd;font-weight:600}
+.mapHistoryCard__ongoing{font-size:11px;border:1px solid #a18b46;border-radius:4px;padding:4px 7px;color:#f2c94c}
+.mapHistoryCard__bottom{border-top:1px solid #ffffff20;padding-top:12px;margin-top:12px;font-size:14px;font-weight:700}
+.mapHistory__empty{padding:18px;border:1px dashed #ffffff30;border-radius:10px;color:#bac4ce;line-height:1.5}
+.history-hint{font-size:11px;color:#aab3bd;margin:14px 0 0;line-height:1.5}
+.leaflet-interactive.area-history-hit{cursor:pointer}
+@media(max-width:600px){.mapHistory__head{padding:18px}.mapHistory__head h2{font-size:21px}.mapHistory__body{padding:14px 16px 18px}.mapHistoryCard{padding:13px}.mapHistoryCard__bottom{font-size:13px}}
+
 @media(max-width:600px){
  #panelToggle{display:flex}
  #panel{top:10px;left:10px;width:310px;max-width:calc(100vw - 20px);max-height:calc(100vh - 20px);transform:translateX(calc(-100% - 20px));opacity:0;pointer-events:none;padding:48px 14px 14px;border-radius:14px}
@@ -101,6 +127,13 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 <body>
 
 <div id="map"></div>
+<dialog class="mapHistory" id="mapHistory" aria-labelledby="map-history-title" aria-modal="true">
+  <header class="mapHistory__head">
+    <div><span>Історія тривог</span><h2 id="map-history-title">Область</h2></div>
+    <button type="button" class="mapHistory__close" id="mapHistoryClose" aria-label="Закрити історію">×</button>
+  </header>
+  <div class="mapHistory__body" id="mapHistoryBody" aria-live="polite"></div>
+</dialog>
 
 <!-- =========================
      MOBILE PANEL BUTTON
@@ -2643,6 +2676,81 @@ async function loadNeptunGeoJSON() {
    RENDER ALERT ZONES
 ========================================================= */
 
+
+/* =========================================================
+   AREA CLICK + LIGHTWEIGHT LOCAL ALERT HISTORY
+   Stores observed state transitions in this browser only.
+========================================================= */
+const ALERT_HISTORY_KEY = "MapaPodiyUA_alertHistory_v1";
+const mapHistoryDialog = document.getElementById("mapHistory");
+const mapHistoryBody = document.getElementById("mapHistoryBody");
+const mapHistoryTitle = document.getElementById("map-history-title");
+document.getElementById("mapHistoryClose").addEventListener("click", () => mapHistoryDialog.close());
+mapHistoryDialog.addEventListener("click", event => {
+  if (event.target === mapHistoryDialog) mapHistoryDialog.close();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && mapHistoryDialog.open) mapHistoryDialog.close();
+});
+function readAlertHistory() {
+  try { const v = JSON.parse(localStorage.getItem(ALERT_HISTORY_KEY) || "[]"); return Array.isArray(v) ? v : []; }
+  catch (_) { return []; }
+}
+function rememberAlertSnapshot() {
+  const now = Date.now(), history = readAlertHistory();
+  const active = [];
+  const collect = (items, kind) => (items || []).forEach(a => {
+    const name = String(a?.name || a?.region || a?.title || "").trim();
+    if (!name) return;
+    active.push({key: kind + ":" + normalizeName(name), name, level: String(a?.level || "red").toLowerCase(), startedAt: Number(a?.startedAt || a?.startTime || a?.start_time || 0) || now, active: true});
+  });
+  collect(neptunAlerts, "district"); collect(neptunAlertOblasts, "oblast");
+  const currentKeys = new Set(active.map(a => a.key));
+  const previousActive = new Map(history.filter(x => x.active).map(x => [x.key, x]));
+  const next = history.map(x => x.active && !currentKeys.has(x.key) ? {...x, active:false, endedAt:now} : x);
+  active.forEach(a => {
+    const old = previousActive.get(a.key);
+    if (old) {
+      const i = next.findIndex(x => x.key === a.key && x.active);
+      if (i >= 0) next[i] = {...next[i], level:a.level};
+    } else next.unshift({...a, observedAt:now});
+  });
+  try { localStorage.setItem(ALERT_HISTORY_KEY, JSON.stringify(next.slice(0,500))); } catch (_) {}
+}
+function formatHistoryTime(ms) {
+  return new Date(ms).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"});
+}
+function showAreaHistory(name) {
+  mapHistoryTitle.textContent = name;
+  const needle = normalizeName(name);
+  const items = readAlertHistory().filter(x => normalizeName(x.name) === needle || needle.includes(normalizeName(x.name)) || normalizeName(x.name).includes(needle))
+    .sort((a,b) => (b.observedAt || b.startedAt || 0) - (a.observedAt || a.startedAt || 0)).slice(0,60);
+  if (!items.length) {
+    mapHistoryBody.innerHTML = '<div class="mapHistory__empty">Для цієї області ще немає записів у локальній історії. Історія починає накопичуватися після відкриття цієї сторінки й отримання даних.</div><p class="history-hint">Це локальний журнал змін, а не повний архів сервісу. Попередні події, які сталися до першого відкриття сторінки, тут не з’являться.</p>';
+  } else {
+    const groups = new Map();
+    items.forEach(x => { const d = new Date(x.observedAt || x.startedAt || Date.now()).toLocaleDateString("uk-UA",{day:"numeric",month:"long",year:"numeric"}); if(!groups.has(d)) groups.set(d,[]); groups.get(d).push(x); });
+    mapHistoryBody.innerHTML = [...groups].map(([date, rows]) => '<section class="mapHistory__day"><h3>'+date+'</h3>'+rows.map(x => {
+      const yellow = /yellow|amber|жовт/i.test(x.level);
+      const start = x.startedAt || x.observedAt || Date.now();
+      const end = x.active ? "триває" : formatHistoryTime(x.endedAt || x.observedAt || start);
+      const duration = x.active ? Math.max(1,Math.round((Date.now()-start)/60000)) : Math.max(1,Math.round(((x.endedAt||start)-start)/60000));
+      return '<article class="mapHistoryCard '+(yellow?'is-yellow':'')+'"><div class="mapHistoryCard__top"><div class="mapHistoryCard__identity"><img src="'+(yellow?'https://map.ukrainealarm.com/images/content/icon_air_yellow.svg':'https://map.ukrainealarm.com/images/content/icon_air.svg')+'" alt=""><div><strong>Повітряна тривога</strong><span class="mapHistoryCard__level">'+(yellow?'Жовтий рівень':'Червоний рівень')+'</span><span class="mapHistoryCard__region">'+x.name+'</span></div></div>'+(x.active?'<span class="mapHistoryCard__ongoing">Триває</span>':'')+'</div><div class="mapHistoryCard__bottom"><span>'+formatHistoryTime(start)+' — '+end+'</span><span class="mapHistoryCard__duration">'+(duration>=60?Math.floor(duration/60)+' год '+duration%60+' хв':duration+' хв')+'</span></div></article>';
+    }).join('')+'</section>').join('')+'<p class="history-hint">Локальна історія цього браузера. Вона не містить подій до першого запуску сторінки.</p>';
+  }
+  if (!mapHistoryDialog.open) mapHistoryDialog.showModal();
+}
+function attachAreaHistory(layer, feature) {
+  const props = feature?.properties || {};
+  const name = String(props.name || props.NAME_1 || props.NAME_2 || props.shapeName || props.admin1Name || props.NAME || "Область");
+  layer.eachLayer?.(part => {
+    if (part.setStyle) part.setStyle({interactive:true, fillOpacity:0.025, opacity:0.8, weight:1.3, color:"#8da8c0"});
+    part.on?.("click", event => { if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent); showAreaHistory(name); });
+    part.on?.("mouseover", () => part.setStyle?.({weight:2.2, color:"#75baff", fillOpacity:0.09}));
+    part.on?.("mouseout", () => part.setStyle?.({weight:1.3, color:"#8da8c0", fillOpacity:0.025}));
+  });
+}
+
 function renderAlertZones() {
 
   neptunRaionLayerGroup.clearLayers();
@@ -2820,6 +2928,24 @@ function renderAlertZones() {
 
   }
 
+  // Build clickable area overlays only when GeoJSON changes; avoid rebuilding
+  // hundreds of polygons on every live alert refresh.
+  if (window.areaHistoryGeoRef?.oblasts !== oblastsGeoJSON ||
+      window.areaHistoryGeoRef?.raions !== raionsGeoJSON) {
+    if (window.areaHistoryHitLayer) window.areaHistoryHitLayer.clearLayers();
+    else window.areaHistoryHitLayer = L.layerGroup().addTo(map);
+    const hitLayer = window.areaHistoryHitLayer;
+    [oblastsGeoJSON, raionsGeoJSON].forEach(collection => {
+      if (!collection || !Array.isArray(collection.features)) return;
+      collection.features.forEach(feature => {
+        const hit = L.geoJSON(feature, {style:{color:"#8da8c0",weight:1.1,opacity:0.55,fillColor:"#8da8c0",fillOpacity:0.001},interactive:true});
+        attachAreaHistory(hit, feature);
+        hit.addTo(hitLayer);
+      });
+    });
+    window.areaHistoryGeoRef = {oblasts:oblastsGeoJSON, raions:raionsGeoJSON};
+  }
+  rememberAlertSnapshot();
   updateVisibility();
 
 }
@@ -4017,7 +4143,7 @@ async function init() {
       }
 
     },
-    5000
+    15000
   );
   
   setInterval(
@@ -4032,7 +4158,7 @@ async function init() {
       }
 
     },
-    5000
+    15000
   );
 
   setInterval(
@@ -4041,7 +4167,7 @@ async function init() {
         loadMapaThreats();
       }
     },
-    5000
+    15000
   );
 
   /*
