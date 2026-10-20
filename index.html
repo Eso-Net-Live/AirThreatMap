@@ -184,7 +184,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
   -->
 
   <div id="status">
-    🟡 Кеш: перевірка...
+    🟢 Підключення до джерел даних...
   </div>
 
 </div>
@@ -433,678 +433,17 @@ let raionsGeoJSON = null;
 let oblastsGeoJSON = null;
 
 /* =========================================================
-   OFFLINE INDEXEDDB
+   NO PERSISTENT CACHE
 ========================================================= */
 
-/*
- * У IndexedDB зберігаємо весь стан карти.
- *
- * Це важливо:
- *
- * Google Sheets
- * NEPTUN threats
- * NEPTUN alerts
- * GeoJSON
- *
- * після успішного онлайн-завантаження залишаються
- * доступними навіть після повного закриття браузера.
- */
-
-const OFFLINE_DB_NAME =
-  "MapaPodiyUA_Offline";
-
-const OFFLINE_DB_VERSION = 1;
-
-const OFFLINE_STORE_NAME =
-  "mapCache";
-
-const OFFLINE_CACHE_KEY =
-  "state";
-
-/*
- * MOBILE FALLBACK
- *
- * Деякі мобільні браузери/режими можуть блокувати або
- * ламати IndexedDB. Тому маємо другий незалежний кеш.
- */
-const OFFLINE_LOCAL_KEY =
-  "MapaPodiyUA_Offline_v2";
-
-let offlineDBPromise = null;
-
-let offlineCacheSavedAt = 0;
-
-let offlineCacheLoaded = false;
-
-let offlineWriteQueue =
-  Promise.resolve();
-
-/* =========================================================
-   OPEN INDEXEDDB
-========================================================= */
-
-function openOfflineDB() {
-
-  if (offlineDBPromise) {
-    return offlineDBPromise;
-  }
-
-  offlineDBPromise =
-    new Promise((resolve, reject) => {
-
-      if (!("indexedDB" in window)) {
-
-        reject(
-          new Error(
-            "IndexedDB не підтримується браузером"
-          )
-        );
-
-        return;
-      }
-
-      const request =
-        indexedDB.open(
-          OFFLINE_DB_NAME,
-          OFFLINE_DB_VERSION
-        );
-
-      request.onupgradeneeded =
-        function(event) {
-
-          const db =
-            event.target.result;
-
-          if (
-            !db.objectStoreNames.contains(
-              OFFLINE_STORE_NAME
-            )
-          ) {
-
-            db.createObjectStore(
-              OFFLINE_STORE_NAME
-            );
-
-          }
-
-        };
-
-      request.onsuccess =
-        function(event) {
-
-          const db =
-            event.target.result;
-
-          // db.onversionchange =
-          //   function() {
-
-          //     db.close();
-
-          //   };
-
-          resolve(db);
-
-        };
-
-      request.onerror =
-        function() {
-
-          reject(
-            request.error ||
-            new Error(
-              "Не вдалося відкрити IndexedDB"
-            )
-          );
-
-        };
-
-    });
-
-  return offlineDBPromise;
-
-}
-
-/* =========================================================
-   SAVE OFFLINE STATE
-========================================================= */
-
-function saveOfflineState() {
-
-  offlineWriteQueue =
-    offlineWriteQueue
-      .then(async () => {
-
-        const state = {
-
-          version:
-            OFFLINE_DB_VERSION,
-
-          savedAt:
-            Date.now(),
-
-          sheetObjects:
-            Array.isArray(sheetObjects)
-              ? sheetObjects
-              : [],
-
-          neptunThreats:
-            Array.isArray(neptunThreats)
-              ? neptunThreats
-              : [],
-
-          mapaThreats:
-            Array.isArray(mapaThreats)
-              ? mapaThreats
-              : [],
-
-          neptunAlerts:
-            Array.isArray(neptunAlerts)
-              ? neptunAlerts
-              : [],
-
-          neptunAlertOblasts:
-            Array.isArray(neptunAlertOblasts)
-              ? neptunAlertOblasts
-              : [],
-
-          raionsGeoJSON:
-            raionsGeoJSON || null,
-
-          oblastsGeoJSON:
-            oblastsGeoJSON || null
-
-        };
-
-        let saved = false;
-
-        /*
-         * 1. Основний кеш — IndexedDB.
-         */
-        try {
-
-          const db =
-            await openOfflineDB();
-
-          await new Promise(
-            (resolve, reject) => {
-
-              const transaction =
-                db.transaction(
-                  OFFLINE_STORE_NAME,
-                  "readwrite"
-                );
-
-              const store =
-                transaction.objectStore(
-                  OFFLINE_STORE_NAME
-                );
-
-              const request =
-                store.put(
-                  state,
-                  OFFLINE_CACHE_KEY
-                );
-
-              request.onsuccess =
-                () => resolve();
-
-              request.onerror =
-                () => reject(
-                  request.error ||
-                  new Error(
-                    "IndexedDB put error"
-                  )
-                );
-
-              transaction.onerror =
-                () => reject(
-                  transaction.error ||
-                  new Error(
-                    "IndexedDB transaction error"
-                  )
-                );
-
-            }
-          );
-
-          saved = true;
-
-          console.log(
-            "OFFLINE: IndexedDB збережено"
-          );
-
-        } catch (error) {
-
-          console.warn(
-            "OFFLINE: IndexedDB save failed:",
-            error
-          );
-
-        }
-
-        /*
-         * 2. Дубльований fallback — localStorage.
-         *
-         * Це особливо важливо для мобільних браузерів.
-         */
-        try {
-
-          localStorage.setItem(
-            OFFLINE_LOCAL_KEY,
-            JSON.stringify(state)
-          );
-
-          saved = true;
-
-          console.log(
-            "OFFLINE: localStorage збережено"
-          );
-
-        } catch (error) {
-
-          console.warn(
-            "OFFLINE: localStorage save failed:",
-            error
-          );
-
-        }
-
-        if (saved) {
-
-          offlineCacheSavedAt =
-            state.savedAt;
-
-          offlineCacheLoaded =
-            true;
-
-          updateStatus();
-
-        } else {
-
-          throw new Error(
-            "Не вдалося зберегти кеш ні в IndexedDB, ні в localStorage"
-          );
-
-        }
-
-      })
-      .catch(error => {
-
-        console.warn(
-          "OFFLINE: помилка збереження:",
-          error
-        );
-
-        updateStatus();
-
-      });
-
-  return offlineWriteQueue;
-
-}
-
-/* =========================================================
-   LOAD OFFLINE STATE
-========================================================= */
-
-async function loadOfflineState() {
-
-  /*
-   * Спочатку пробуємо IndexedDB.
-   */
-  try {
-
-    const db =
-      await openOfflineDB();
-
-    const state =
-      await new Promise(
-        (resolve, reject) => {
-
-          const transaction =
-            db.transaction(
-              OFFLINE_STORE_NAME,
-              "readonly"
-            );
-
-          const store =
-            transaction.objectStore(
-              OFFLINE_STORE_NAME
-            );
-
-          const request =
-            store.get(
-              OFFLINE_CACHE_KEY
-            );
-
-          request.onsuccess =
-            () => resolve(
-              request.result || null
-            );
-
-          request.onerror =
-            () => reject(
-              request.error ||
-              new Error(
-                "IndexedDB get error"
-              )
-            );
-
-        }
-      );
-
-    if (
-      state &&
-      state.version ===
-        OFFLINE_DB_VERSION
-    ) {
-
-      console.log(
-        "OFFLINE: кеш знайдено в IndexedDB"
-      );
-
-      return state;
-
-    }
-
-  } catch (error) {
-
-    console.warn(
-      "OFFLINE: IndexedDB read failed:",
-      error
-    );
-
-  }
-
-  /*
-   * Якщо IndexedDB недоступний або порожній —
-   * пробуємо localStorage.
-   */
-  try {
-
-    const raw =
-      localStorage.getItem(
-        OFFLINE_LOCAL_KEY
-      );
-
-    if (!raw) {
-
-      console.log(
-        "OFFLINE: localStorage кеш відсутній"
-      );
-
-      return null;
-
-    }
-
-    const state =
-      JSON.parse(raw);
-
-    if (
-      !state ||
-      state.version !==
-        OFFLINE_DB_VERSION
-    ) {
-
-      console.warn(
-        "OFFLINE: localStorage кеш іншої версії"
-      );
-
-      return null;
-
-    }
-
-    console.log(
-      "OFFLINE: кеш знайдено в localStorage"
-    );
-
-    return state;
-
-  } catch (error) {
-
-    console.warn(
-      "OFFLINE: localStorage read failed:",
-      error
-    );
-
-  }
-
-  return null;
-
-}
-
-/* =========================================================
-   FORMAT CACHE AGE
-========================================================= */
-
-function formatCacheAge(timestamp) {
-
-  if (
-    !timestamp ||
-    !Number.isFinite(
-      Number(timestamp)
-    )
-  ) {
-
-    return "невідомо";
-
-  }
-
-  const diff =
-    Math.max(
-      0,
-      Date.now() -
-      Number(timestamp)
-    );
-
-  const seconds =
-    Math.floor(
-      diff / 1000
-    );
-
-  if (seconds < 60) {
-
-    return (
-      seconds +
-      " сек. тому"
-    );
-
-  }
-
-  const minutes =
-    Math.floor(
-      seconds / 60
-    );
-
-  if (minutes < 60) {
-
-    return (
-      minutes +
-      " хв. тому"
-    );
-
-  }
-
-  const hours =
-    Math.floor(
-      minutes / 60
-    );
-
-  if (hours < 24) {
-
-    return (
-      hours +
-      " год. тому"
-    );
-
-  }
-
-  const days =
-    Math.floor(
-      hours / 24
-    );
-
-  return (
-    days +
-    " дн. тому"
-  );
-
-}
-
-/* =========================================================
-   RESTORE OFFLINE STATE
-========================================================= */
-
-async function restoreOfflineState() {
-
-  const state =
-    await loadOfflineState();
-
-  if (!state) {
-
-    return false;
-
-  }
-
-  /*
-   * Перевіряємо кожне поле окремо.
-   *
-   * Це захищає від пошкодженого/неповного кешу.
-   */
-
-  if (
-    Array.isArray(
-      state.sheetObjects
-    )
-  ) {
-
-    sheetObjects =
-      state.sheetObjects;
-
-  }
-
-  if (
-    Array.isArray(
-      state.neptunThreats
-    )
-  ) {
-
-    neptunThreats =
-      state.neptunThreats;
-
-  }
-
-  if (Array.isArray(state.mapaThreats)) {
-    mapaThreats = state.mapaThreats;
-  }
-
-  if (
-    Array.isArray(
-      state.neptunAlerts
-    )
-  ) {
-
-    neptunAlerts =
-      state.neptunAlerts;
-
-  }
-
-  if (
-    Array.isArray(
-      state.neptunAlertOblasts
-    )
-  ) {
-
-    neptunAlertOblasts =
-      state.neptunAlertOblasts;
-
-  }
-
-  if (
-    state.raionsGeoJSON &&
-    typeof state.raionsGeoJSON ===
-      "object"
-  ) {
-
-    raionsGeoJSON =
-      state.raionsGeoJSON;
-
-  }
-
-  if (
-    state.oblastsGeoJSON &&
-    typeof state.oblastsGeoJSON ===
-      "object"
-  ) {
-
-    oblastsGeoJSON =
-      state.oblastsGeoJSON;
-
-  }
-
-  offlineCacheSavedAt =
-    Number(state.savedAt) || 0;
-
-  offlineCacheLoaded = true;
-
-  /*
-   * Спочатку відновлюємо кешовану карту.
-   */
-
-  renderSheetObjects();
-
-  renderNahrThreats();
-
-  renderNeptunThreats();
-
-  renderMapaThreats();
-
-  renderAlertZones();
-
-  updateVisibility();
-
-  updateAlertBadge();
-
-  updateCategoryCounts();
-
-  updateStatus();
-
-  console.log(
-    "OFFLINE: кеш відновлено",
-    state
-  );
-
-  return true;
-
-}
-
-/* =========================================================
-   OFFLINE STATUS
-========================================================= */
-
-function getOfflineStatusText() {
-
-  if (!offlineCacheLoaded) {
-
-    return "Офлайн: збережених даних немає";
-
-  }
-
-  if (offlineCacheSavedAt) {
-
-    return (
-      "Офлайн: показано збережені дані<br>" +
-      "Кеш: " +
-      formatCacheAge(
-        offlineCacheSavedAt
-      )
-    );
-
-  }
-
-  return "Офлайн: показано збережені дані";
-
-}
+// Clean up data saved by older versions. Current page data stays in memory only.
+try {
+  localStorage.removeItem("MapaPodiyUA_Offline_v2");
+  localStorage.removeItem("MapaPodiyUA_customThreats_v1");
+} catch (_) {}
+try {
+  if (window.indexedDB) indexedDB.deleteDatabase("MapaPodiyUA_Offline");
+} catch (_) {}
 
 /* =========================================================
    ONLINE / OFFLINE EVENTS
@@ -1802,8 +1141,6 @@ async function loadMapaThreats() {
 
     updateCategoryCounts();
     updateStatus();
-
-    await saveOfflineState();
 
     console.log(
       "MAPA.UA:",
@@ -2672,11 +2009,10 @@ async function loadNeptunGeoJSON() {
       "из", successfulRegionFiles, "файлов областей");
 
     renderAlertZones();
-    await saveOfflineState();
     updateStatus();
   } catch (error) {
     console.error("GeoJSON NEPTUN:", error);
-    // Если новая геометрия не загрузилась, оставляем ранее сохранённый кеш.
+    // Если новая геометрия не загрузилась, показуємо лише дані поточного сеансу.
     renderAlertZones();
     updateStatus();
   }
@@ -2692,9 +2028,7 @@ async function loadNeptunGeoJSON() {
    Data source: AirThreatMap alarm.json
 ========================================================= */
 const CUSTOM_THREATS_URL = "https://eso-net-live.github.io/AirThreatMap/alarm.json";
-const CUSTOM_THREATS_CACHE_KEY = "MapaPodiyUA_customThreats_v1";
 let customThreats = [];
-let customThreatsUpdatedAt = 0;
 const mapHistoryDialog = document.getElementById("mapHistory");
 const mapHistoryBody = document.getElementById("mapHistoryBody");
 const mapHistoryTitle = document.getElementById("map-history-title");
@@ -2852,8 +2186,7 @@ async function loadCustomThreats() {
     const data = await response.json();
     if (!Array.isArray(data)) throw new Error("alarm.json має бути масивом");
     customThreats = data.filter(item => item && typeof item === "object" && (item.name || item.oblast));
-    customThreatsUpdatedAt = Date.now();
-    try { localStorage.setItem(CUSTOM_THREATS_CACHE_KEY, JSON.stringify({updatedAt:customThreatsUpdatedAt, items:customThreats})); } catch (_) {}
+    // Кастомні загрози щоразу завантажуються заново з актуального JSON.
     // Rebuild the lightweight oblast overlay so custom colors update on the map.
     if (window.areaHistoryGeoRef) {
       window.areaHistoryGeoRef = null;
@@ -2863,15 +2196,9 @@ async function loadCustomThreats() {
     console.log("AirThreatMap custom threats:", customThreats.length);
   } catch (error) {
     console.warn("Не вдалося завантажити кастомні загрози:", error);
-    if (!customThreats.length) {
-      try {
-        const cached = JSON.parse(localStorage.getItem(CUSTOM_THREATS_CACHE_KEY) || "null");
-        if (Array.isArray(cached?.items)) {
-          customThreats = cached.items;
-          customThreatsUpdatedAt = Number(cached.updatedAt) || 0;
-        }
-      } catch (_) {}
-    }
+    // Якщо джерело недоступне, не показуємо застарілі загрози.
+    customThreats = [];
+    if (mapHistoryDialog.open) showAreaHistory(mapHistoryTitle.textContent);
   }
 }
 
@@ -3685,8 +3012,6 @@ async function loadNeptunAlerts() {
      * успішної валідної відповіді.
      */
 
-    await saveOfflineState();
-
   } catch (error) {
 
     console.error(
@@ -3792,8 +3117,6 @@ async function loadNeptunThreats() {
      * Зберігаємо актуальні загрози.
      */
 
-    await saveOfflineState();
-
   } catch (error) {
 
     console.error(
@@ -3857,116 +3180,27 @@ function updateAlertBadge() {
 ========================================================= */
 
 function updateStatus() {
+  const status = document.getElementById("status");
+  if (!status) return;
 
-  const status =
-    document.getElementById(
-      "status"
-    );
+  const alerts = neptunAlerts.length + neptunAlertOblasts.length;
+  const uavs = neptunThreats.filter(threat =>
+    getNeptunThreatCategory(threat) === NEPTUN_CATEGORY_UAV
+  ).length;
+  const news = sheetObjects.filter(obj => getSheetCategory(obj) === "13").length;
+  const networkText = navigator.onLine ? "🟢 ОНЛАЙН" : "🔴 ОФЛАЙН";
 
-  if (!status) {
-    return;
-  }
-
-  const alerts =
-    neptunAlerts.length +
-    neptunAlertOblasts.length;
-
-  const uavs =
-    neptunThreats.filter(
-      threat =>
-        getNeptunThreatCategory(
-          threat
-        ) ===
-        NEPTUN_CATEGORY_UAV
-    ).length;
-
-  const news =
-    sheetObjects.filter(
-      obj =>
-        getSheetCategory(
-          obj
-        ) === "13"
-    ).length;
-
-  /*
-   * Кеш показуємо ЗАВЖДИ.
-   */
-  let cacheText =
-    "перевірка...";
-
-  if (offlineCacheLoaded) {
-
-    cacheText =
-      offlineCacheSavedAt
-        ? formatCacheAge(
-            offlineCacheSavedAt
-          )
-        : "збережено";
-
-  } else if (
-    !navigator.onLine
-  ) {
-
-    cacheText =
-      "даних немає";
-
-  } else {
-
-    cacheText =
-      "порожній";
-
-  }
-
-  const networkText =
-    navigator.onLine
-      ? "🟢 ОНЛАЙН"
-      : "🔴 ОФЛАЙН";
-
-  const cacheMode =
-    offlineCacheLoaded
-      ? (
-          navigator.onLine
-            ? "збережені дані доступні"
-            : "показано збережені дані"
-        )
-      : (
-          navigator.onLine
-            ? "кеш ще не завантажено"
-            : "збережених даних немає"
-        );
-
-  status.innerHTML =
-    `
+  status.innerHTML = `
     ${networkText}
-
-    <br>
-    ${cacheMode}
-
-    <br>
-    Кеш:
-    ${cacheText}
-
     <br><br>
-
-    Google Sheets:
-    ${sheetObjects.length}
-
+    Google Sheets: ${sheetObjects.length}
     <br>
-
-    📰 Новин:
-    ${news}
-
+    📰 Новин: ${news}
     <br>
-
-    NEPTUN тривог:
-    ${alerts}
-
+    NEPTUN тривог: ${alerts}
     <br>
-
-    NEPTUN БпЛА:
-    ${uavs}
-    `;
-
+    NEPTUN БпЛА: ${uavs}
+  `;
 }
 
 /* =========================================================
@@ -4094,12 +3328,8 @@ function startNeptunRealtime() {
            * ВАЖЛИВО:
            *
            * realtime snapshot може не містити
-           * GeoJSON, тому saveOfflineState()
-           * бере вже наявний GeoJSON і не
-           * затирає його null-ом.
+           * GeoJSON, тому дані не записуються в постійне сховище.
            */
-
-          saveOfflineState();
 
         }
 
@@ -4174,39 +3404,8 @@ async function init() {
 
   createCategoryPanel();
 
-  /*
-   * =======================================================
-   * ПЕРШИЙ КРОК:
-   * ВІДНОВЛЕННЯ INDEXEDDB
-   * =======================================================
-   *
-   * Це спеціально виконується ПЕРЕД мережевими запитами.
-   *
-   * Якщо користувач відкрив карту офлайн,
-   * тут одразу з'являться старі маркери,
-   * тривоги та GeoJSON.
-   */
-
-  try {
-
-    await restoreOfflineState();
-
-  } catch (error) {
-
-    console.warn(
-      "OFFLINE restore:",
-      error
-    );
-
-  }
-
-  /*
-   * Після відновлення кешу карта вже може
-   * бути показана користувачу.
-   */
-
+  // No persistent cache restoration: fetch current data on every page load.
   updateVisibility();
-
   updateStatus();
 
   /*
@@ -4216,7 +3415,7 @@ async function init() {
    *
    * Не покладаємося тільки на navigator.onLine.
    * На телефонах він інколи каже "online", хоча fetch
-   * фактично не працює. Кеш у такому випадку залишається.
+   * фактично не працює. Дані не зберігаються між відкриттями сторінки.
    */
 
   updateStatus();
@@ -4297,8 +3496,7 @@ async function init() {
   setInterval(function() { if (navigator.onLine) loadCustomThreats(); }, 60000);
 
   /*
-   * Оновлюємо статус кешу періодично,
-   * щоб час "N хв. тому" був актуальним.
+   * Оновлюємо індикатор мережі періодично.
    */
 
   setInterval(
