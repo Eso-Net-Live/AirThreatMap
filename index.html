@@ -2151,9 +2151,7 @@ function showAreaHistory(name) {
         return '<article class="mapHistoryCard ' + className + '">' +
           '<div class="mapHistoryCard__top"><div class="mapHistoryCard__identity">' +
           '<img class="mapHistoryCard__icon" src="' + iconUrl + '" alt="" loading="lazy" referrerpolicy="no-referrer">' +
-          '<div><strong>Повітряна тривога</strong><span class="mapHistoryCard__level'+level.kind === "yellow"
-          ? ""
-          : " red";+'">' + safeThreatText(level.label) + '</span>' +
+          '<div><strong>Повітряна тривога</strong><span class="mapHistoryCard__level'+(level.kind === "yellow" ? "" : " red" )+'">' + safeThreatText(level.label) + '</span>' +
           '<span class="mapHistoryCard__region">' + district + '</span></div></div></div>' +
           '<div class="mapHistoryCard__bottom"><span>' + clock + ' — триває</span></div></article>';
       }).join("") + '</section>';
