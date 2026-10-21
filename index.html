@@ -5,8 +5,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>МПЗ — карта v2</title>
+<title>Мапа повітряних тривог України</title>
 
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <link
   rel="stylesheet"
   href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -18,433 +20,120 @@
 >
 
 <style>
-
-* {
-  box-sizing: border-box;
+:root{
+  color-scheme:dark;
+  --bg:#111820;
+  --panel:#18232e;
+  --panel2:#202d3a;
+  --line:rgba(202,220,235,.13);
+  --text:#edf4fa;
+  --muted:#9eafbd;
+  --accent:#4da3ff;
+  --danger:#ff4d5e;
 }
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  font-family: Arial, sans-serif;
-  background: #111;
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#0b1117;color:var(--text)}
+#map{position:absolute;inset:0;width:100%;height:100%;background:#101820}
+.leaflet-container{font:14px/1.45 Inter,system-ui,sans-serif;background:#101820}
+.leaflet-control-zoom{border:1px solid var(--line)!important;border-radius:10px!important;overflow:hidden;box-shadow:0 5px 20px #0005!important}
+.leaflet-control-zoom a{background:#18232e!important;color:#edf4fa!important;border-color:var(--line)!important}
+.leaflet-control-zoom a:hover{background:#263747!important}
+.leaflet-control-attribution{background:#101820d9!important;color:#9eafbd!important;border-radius:6px 0 0 0}
+.leaflet-control-attribution a{color:#8fc5ff!important}
+#panel{
+ position:absolute;z-index:1000;top:16px;left:16px;width:340px;max-width:calc(100vw - 32px);
+ max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;
+ background:rgba(19,29,39,.96);color:var(--text);border:1px solid var(--line);
+ border-radius:16px;padding:18px;box-shadow:0 14px 42px #0007;backdrop-filter:blur(16px);
+ transition:transform .24s ease,opacity .24s ease;
+ scrollbar-width:thin;scrollbar-color:#3a4c5b transparent
 }
+#panel h2{font-size:17px;line-height:1.35;font-weight:750;letter-spacing:-.25px;margin:0 38px 16px 0;padding-bottom:14px;border-bottom:1px solid var(--line)}
+#categories{display:flex;flex-direction:column;gap:5px}
+.category{display:flex;align-items:center;gap:10px;padding:11px 10px;border:1px solid transparent;border-radius:10px;cursor:pointer;user-select:none;transition:background .15s,border-color .15s}
+.category:hover{background:#ffffff0a;border-color:#ffffff0c}
+.category:has(input:checked){background:#4da3ff12;border-color:#4da3ff25}
+.category input{appearance:none;flex:0 0 18px;width:18px;height:18px;margin:0;border:1.5px solid #718392;border-radius:5px;background:#111a23;cursor:pointer;display:grid;place-items:center}
+.category input:checked{background:var(--accent);border-color:var(--accent)}
+.category input:checked:after{content:"";width:8px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg);margin-top:-2px}
+.category.is-disabled{opacity:.48;cursor:not-allowed;background:#ffffff04}
+.category input:disabled{cursor:not-allowed;opacity:.7}
+.category.is-disabled:hover{background:#ffffff04;border-color:transparent}
+.category-name{flex:1;font-size:13px;font-weight:600;color:#dce7ef;line-height:1.35}
+.category-count{min-width:28px;padding:4px 7px;border-radius:7px;background:#2a3947;color:#d8e6f1;font-size:11px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums}
+#status{margin-top:14px;padding:12px 12px;border:1px solid var(--line);border-radius:10px;background:#0f1821;color:var(--muted);font-size:11px;line-height:1.55}
+#alertBadge{margin-top:10px;padding:10px;border-radius:10px;background:#ff4d5e20;border:1px solid #ff4d5e80;color:#ff8994;font-weight:750;font-size:12px;text-align:center;animation:alertPulse 3s infinite}
+@keyframes alertPulse{50%{opacity:.58}}
+#panelToggle{position:absolute;z-index:1100;top:16px;left:16px;width:46px;height:46px;border:1px solid var(--line);border-radius:13px;background:#17232f;color:white;font-size:22px;display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 24px #0006;backdrop-filter:blur(12px)}
+#panelToggle:hover{background:#263747}
+#panelToggle:active{transform:scale(.96)}
+#panelClose{display:none;position:absolute;top:12px;right:12px;width:32px;height:32px;border:1px solid var(--line);border-radius:9px;background:#ffffff08;color:#dce7ef;font-size:17px;cursor:pointer}
+#panelClose:hover{background:#ffffff15}
+#neptunAttribution{position:absolute;z-index:1001;right:12px;bottom:12px;background:rgba(17,26,35,.9);color:#b6c7d5;border:1px solid var(--line);padding:7px 10px;border-radius:9px;font-size:11px;box-shadow:0 4px 14px #0004;backdrop-filter:blur(10px)}
+#neptunAttribution a{color:#a8d2ff;text-decoration:none}
+#neptunAttribution a:hover{text-decoration:underline}
+.emoji-marker{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#111820eF;border:2px solid white;font-size:19px;box-shadow:0 3px 12px #0009}
+.neptun-threat-marker,.mapa-threat-marker{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#f59e0bdc;border:2px solid #fff;box-shadow:0 0 14px #f59e0b99,0 3px 12px #0008;font-size:21px}
+.neptun-threat-marker.redLevel,.mapa-threat-marker.redLevel{background:#ef3340ed;box-shadow:0 0 22px #ef3340b8,0 3px 12px #0008}
+.neptun-alert-pulse{animation:neptunPulse 1.2s infinite}
+@keyframes neptunPulse{50%{filter:brightness(1.5);box-shadow:0 0 24px #f33,0 3px 10px #0008}}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#18232e;color:#edf4fa;box-shadow:0 8px 28px #0007}
+.leaflet-popup-content-wrapper{border:1px solid #ffffff1a;border-radius:12px}
+.leaflet-popup-content{font-size:14px!important;line-height:1.5!important;margin:14px 16px!important;max-width:min(340px,75vw)}
+.leaflet-popup-content b,.leaflet-popup-content strong{font-size:15px!important}
+.leaflet-popup-content a{font-size:13px!important;color:#8fc5ff!important}
+.leaflet-popup-close-button{color:#c7d5e0!important}
 
-#map {
-  width: 100%;
-  height: 100%;
+/* Alert history dialog */
+.mapHistory{width:min(680px,calc(100vw - 28px));max-width:none;max-height:min(88vh,760px);padding:0;border:1px solid #ffffff24;border-radius:14px;background:#282d33;color:#edf0f4;box-shadow:0 24px 80px #000a;overflow:hidden}
+.mapHistory::backdrop{background:#070b10b8;backdrop-filter:blur(3px)}
+.mapHistory__head{display:flex;justify-content:space-between;align-items:center;padding:24px 28px 18px;border-bottom:1px solid #ffffff20}
+.mapHistory__head span{font-size:12px;color:#aab3bd;font-weight:700}
+.mapHistory__head h2{margin:5px 0 0;font-size:25px;line-height:1.2}
+.mapHistory__close{width:44px;height:44px;border:1px solid #ffffff24;border-radius:50%;background:transparent;color:#f4f6f8;font-size:28px;cursor:pointer}
+.mapHistory__body{padding:18px 28px 24px;overflow:auto;max-height:calc(88vh - 100px);overscroll-behavior:contain}
+.mapHistory__day h3{font-size:12px;color:#aab3bd;border-bottom:1px solid #ffffff20;padding-bottom:10px;margin:10px 0 14px}
+.mapHistoryCard{padding:16px 17px;margin:0 0 10px;border:1px solid #ffffff20;border-radius:10px;background:#282d33}
+.mapHistoryCard.is-yellow{background:#4b4229;border-color:#a18b46}
+.mapHistoryCard.is-red{background:#482b32;border-color:#b83b4b}
+.mapHistoryCard.is-neutral{background:#28323b;border-color:#566575}
+.mapHistoryCard.is-custom{background:#292f35;border-color:var(--custom-threat-color,#566575)}
+.mapHistoryCard__customText strong{font-size:17px;line-height:1.3;color:#f5f7fa}
+.mapHistoryCard__customText .mapHistoryCard__region{font-size:11px;line-height:1.35}
+.mapHistoryCard__customText .custom-threat-name{font-size:12px;line-height:1.4;color:#c6d0d9;font-weight:600;margin-top:2px}
+.mapHistoryCard.is-custom .mapHistoryCard__bottom{font-size:12px;color:#c6d0d9;margin-top:10px}
+.mapHistoryCard__reason{font-size:12px;color:#d0d9e1;margin-top:8px;line-height:1.45}
+.mapHistoryCard__icon{width:28px;height:28px;object-fit:contain;flex:none}
+.mapHistoryCard__customIcon{align-self:flex-start;margin-top:2px}
+.mapHistoryCard__top,.mapHistoryCard__bottom,.mapHistoryCard__identity{display:flex;align-items:center;gap:10px}
+.mapHistoryCard__top,.mapHistoryCard__bottom{justify-content:space-between}
+.mapHistoryCard__identity img{width:28px;height:28px;flex:none}
+.mapHistoryCard__identity>div{display:flex;flex-direction:column;gap:3px}
+.mapHistoryCard__identity strong{font-size:14px}
+.mapHistoryCard__level{font-size:12px;color:#f2c94c;font-weight:700}
+.mapHistoryCard__level.red{color:#f18d85}
+.mapHistoryCard__region,.mapHistoryCard__duration{font-size:12px;color:#aab3bd;font-weight:600}
+.mapHistoryCard__ongoing{font-size:11px;border:1px solid #a18b46;border-radius:4px;padding:4px 7px;color:#f2c94c}
+.mapHistoryCard__bottom{border-top:1px solid #ffffff20;padding-top:12px;margin-top:12px;font-size:14px;font-weight:700}
+.mapHistory__empty{padding:18px;border:1px dashed #ffffff30;border-radius:10px;color:#bac4ce;line-height:1.5}
+.history-hint{font-size:11px;color:#aab3bd;margin:14px 0 0;line-height:1.5}
+.leaflet-interactive.area-history-hit{cursor:pointer}
+@media(max-width:600px){.mapHistory__head{padding:18px}.mapHistory__head h2{font-size:21px}.mapHistory__body{padding:14px 16px 18px}.mapHistoryCard{padding:13px}.mapHistoryCard__bottom{font-size:13px}}
+
+@media(max-width:600px){
+ #panelToggle{display:flex}
+ #panel{top:10px;left:10px;width:310px;max-width:calc(100vw - 20px);max-height:calc(100vh - 20px);transform:translateX(calc(-100% - 20px));opacity:0;pointer-events:none;padding:48px 14px 14px;border-radius:14px}
+ #panel.panel-open{transform:translateX(0);opacity:1;pointer-events:auto}
+ #panelClose{display:block}
+ #panel h2{font-size:15px;margin-bottom:12px}
+ .category{padding:10px 8px}
+ .category-name{font-size:12px}
+ #neptunAttribution{right:6px;bottom:6px;font-size:10px;padding:5px 7px}
+ .leaflet-popup-content{max-width:calc(100vw - 90px);font-size:13px!important}
 }
-
-/* =========================
-   PANEL
-========================= */
-
-#panel {
-  position: absolute;
-  z-index: 1000;
-
-  top: 10px;
-  left: 10px;
-
-  width: 300px;
-  max-width: calc(100vw - 20px);
-
-  max-height: calc(100vh - 20px);
-  overflow-y: auto;
-
-  background: rgba(20, 20, 20, 0.94);
-  color: white;
-
-  border-radius: 12px;
-  padding: 12px;
-
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
-
-  backdrop-filter: blur(8px);
-
-  transition:
-    transform 0.25s ease,
-    opacity 0.25s ease;
-}
-
-#panel h2 {
-  margin: 0 0 10px 0;
-  font-size: 18px;
-}
-
-.category {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  padding: 7px 4px;
-  border-radius: 7px;
-
-  cursor: pointer;
-  user-select: none;
-}
-
-.category:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.category input {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.category-name {
-  flex: 1;
-  font-size: 14px;
-}
-
-.category-count {
-  min-width: 22px;
-  padding: 2px 6px;
-
-  border-radius: 10px;
-
-  background: rgba(255, 255, 255, 0.12);
-  color: #ddd;
-
-  font-size: 11px;
-  text-align: center;
-}
-
-#status {
-  margin-top: 9px;
-  padding-top: 8px;
-
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-
-  font-size: 11px;
-  color: #aaa;
-  line-height: 1.4;
-}
-
-#alertBadge {
-  display: none;
-
-  margin-top: 8px;
-  padding: 8px;
-
-  border-radius: 8px;
-
-  background: rgba(255, 0, 0, 0.22);
-  border: 1px solid rgba(255, 60, 60, 0.6);
-
-  color: #ff7777;
-
-  font-weight: bold;
-  font-size: 13px;
-
-  text-align: center;
-
-  animation: alertPulse 1.5s infinite;
-}
-
-@keyframes alertPulse {
-
-  0% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.55;
-  }
-
-  100% {
-    opacity: 1;
-  }
-
-}
-
-/* =========================
-   PANEL BUTTON
-========================= */
-
-#panelToggle {
-  position: absolute;
-  z-index: 1100;
-
-  top: 10px;
-  left: 10px;
-
-  width: 46px;
-  height: 46px;
-
-  border: none;
-  border-radius: 12px;
-
-  background: rgba(20, 20, 20, 0.94);
-  color: white;
-
-  font-size: 24px;
-  line-height: 46px;
-
-  text-align: center;
-
-  cursor: pointer;
-
-  box-shadow:
-    0 4px 15px rgba(0, 0, 0, 0.45);
-
-  backdrop-filter: blur(8px);
-
-  display: none;
-}
-
-#panelToggle:hover {
-  background: rgba(45, 45, 45, 0.96);
-}
-
-.category-disabled {
-  opacity: 0.45;
-  cursor: not-allowed !important;
-}
-
-.category-disabled input,
-.category input:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.category-disabled:hover {
-  background: transparent !important;
-}
-
-#panelToggle:active {
-  transform: scale(0.95);
-}
-
-/* =========================
-   CLOSE BUTTON
-========================= */
-
-#panelClose {
-  display: none;
-
-  position: absolute;
-
-  top: 8px;
-  right: 8px;
-
-  width: 34px;
-  height: 34px;
-
-  border: none;
-  border-radius: 8px;
-
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
-
-  font-size: 20px;
-
-  cursor: pointer;
-}
-
-#panelClose:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-/* =========================
-   NEPTUN ATTRIBUTION
-========================= */
-
-#neptunAttribution {
-  position: absolute;
-  z-index: 1001;
-
-  right: 10px;
-  bottom: 10px;
-
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-
-  padding: 5px 8px;
-  border-radius: 6px;
-
-  font-size: 11px;
-}
-
-#neptunAttribution a {
-  color: #fff;
-  text-decoration: none;
-}
-
-#neptunAttribution a:hover {
-  text-decoration: underline;
-}
-
-/* =========================
-   MARKERS
-========================= */
-
-.emoji-marker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 34px;
-  height: 34px;
-
-  border-radius: 50%;
-  
-  background: rgba(0, 0, 0, 0.78);
-  border: 2px solid white;
-
-  font-size: 20px;
-
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.neptun-threat-marker {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 40px;
-  height: 40px;
-
-  border-radius: 50%;
-
-  background: rgba(255, 153, 0, 0.92);
-  border: 3px solid white;
-
-  font-size: 21px;
-
-  box-shadow:
-    0 0 12px rgba(255, 153, 0, 0.9),
-    0 3px 10px rgba(0, 0, 0, 0.6);
-}
-
-
-.neptun-alert-pulse {
-  animation: neptunPulse 1.2s infinite;
-}
-
-@keyframes neptunPulse {
-
-  0% {
-    box-shadow:
-      0 0 5px rgba(255, 0, 0, 0.5),
-      0 3px 10px rgba(0, 0, 0, 0.5);
-  }
-
-  50% {
-    box-shadow:
-      0 0 24px rgba(255, 0, 0, 1),
-      0 3px 10px rgba(0, 0, 0, 0.5);
-  }
-
-  100% {
-    box-shadow:
-      0 0 5px rgb(99, 0, 0)
-      0 3px 10px rgba(0, 0, 0, 0.5);
-  }
-
-}
-
-/* =========================
-   MOBILE PANEL
-========================= */
-
-@media (max-width: 600px) {
-
-  #panelToggle {
-    display: block;
-  }
-
-  #panel {
-    top: 10px;
-    left: 10px;
-
-    width: 285px;
-    max-width: calc(100vw - 20px);
-
-    max-height: calc(100vh - 20px);
-
-    transform: translateX(
-      calc(-100% - 20px)
-    );
-
-    opacity: 0;
-
-    pointer-events: none;
-
-    padding-top: 45px;
-  }
-
-  #panel.panel-open {
-    transform: translateX(0);
-
-    opacity: 1;
-
-    pointer-events: auto;
-  }
-
-  #panelClose {
-    display: block;
-  }
-
-  #panel h2 {
-    font-size: 16px;
-  }
-
-  .category-name {
-    font-size: 13px;
-  }
-
-  #neptunAttribution {
-    right: 6px;
-    bottom: 6px;
-
-    font-size: 10px;
-
-    padding: 4px 6px;
-  }
-
-}
-
-/* =========================
-   VERY SMALL PHONES
-========================= */
-
-@media (max-width: 380px) {
-
-  #panel {
-    width: 270px;
-  }
-
-  #panelToggle {
-    width: 42px;
-    height: 42px;
-
-    line-height: 42px;
-
-    font-size: 22px;
-  }
-
-}
-
-
-/* Увеличенный шрифт во всех popup: в 2 раза */
-.leaflet-popup-content {
-  font-size: 32px !important;
-  line-height: 1.35 !important;
-}
-.leaflet-popup-content b,
-.leaflet-popup-content strong {
-  font-size: 32px !important;
-}
-.leaflet-popup-content a {
-  font-size: 32px !important;
+@media(max-width:380px){
+ #panel{width:280px}
+ #panelToggle{width:42px;height:42px}
 }
 </style>
 </head>
@@ -452,6 +141,13 @@ body {
 <body>
 
 <div id="map"></div>
+<dialog class="mapHistory" id="mapHistory" aria-labelledby="map-history-title" aria-modal="true">
+  <header class="mapHistory__head">
+    <div><span>Активні загрози</span><h2 id="map-history-title">Область</h2></div>
+    <button type="button" class="mapHistory__close" id="mapHistoryClose" aria-label="Закрити історію">×</button>
+  </header>
+  <div class="mapHistory__body" id="mapHistoryBody" aria-live="polite"></div>
+</dialog>
 
 <!-- =========================
      MOBILE PANEL BUTTON
@@ -481,7 +177,7 @@ body {
     ✕
   </button>
 
-  <h2>🗺️ Мапа повітряних загроз — карта</h2>
+  <h2>🛰️ Мапа повітряних загроз</h2>
 
   <div id="categories"></div>
 
@@ -492,7 +188,7 @@ body {
   -->
 
   <div id="status">
-    🟡 Кеш: перевірка...
+    🟢 Підключення до джерел даних...
   </div>
 
 </div>
@@ -503,7 +199,7 @@ body {
     target="_blank"
     rel="noopener noreferrer"
   >
-    Дані: NEPTUN
+    Дані: NEPTUN • MAPA.UA
   </a>
 </div>
 
@@ -533,14 +229,24 @@ const NAHR_URL =
 const NEPTUN_ALERTS_URL =
   NEPTUN_URL + "/api/v1/alerts";
 
+
 const NEPTUN_THREATS_URL =
   NEPTUN_URL + "/api/v1/threats";
+
+const MAPA_THREATS_URL =
+  "https://mapa.ua/api/v1/current";
+
+function getMapaThreatsURL() {
+  return MAPA_THREATS_URL + "?t=" + Date.now();
+}
+
 
 const NAHR_THREATS_URL = 
   NAHR_URL + "api/alerts?et=1789153733-yveXuMVeU6fjv1EfFNowVYVTqmT2JumGutWY4XqOW8M";
   
 const NEPTUN_CATEGORY_ALERT = "1";
 const NEPTUN_CATEGORY_UAV = "2";
+const MAPA_CATEGORY_THREAT = "3";
 
 /*
  * NEPTUN API не отдаёт нам готовые границы через указанные
@@ -548,11 +254,11 @@ const NEPTUN_CATEGORY_UAV = "2";
  * административных границ Украины.
  */
 
-const RAIONS_GEOJSON_URL =
-  "https://raw.githubusercontent.com/slawomirmatuszak/ukrainian_geodata/main/rayony.geojson";
-
-const OBLASTS_GEOJSON_URL =
-  "https://raw.githubusercontent.com/slawomirmatuszak/ukrainian_geodata/main/regiony.geojson";
+// Актуальні межі з OSM administrative boundaries (GeoJSON).
+// Ukraine.geojson містить межі областей; окремі файли областей — їхні райони.
+const GEOJSON_BASE_URL =
+  "https://cdn.jsdelivr.net/gh/darmat1/ukraine-geo-data@main/geodata";
+const OBLASTS_GEOJSON_URL = GEOJSON_BASE_URL + "/Ukraine.geojson";
 const OBLAST_GEOJSON_RU_URL = "https://raw.githubusercontent.com/datasets/geo-boundaries-world-1/master/countries/RUS.geojson"
 /* =========================================================
    КАТЕГОРІЇ
@@ -577,8 +283,6 @@ const categories = {
     minZoom: 0,
     show: true
   },
-
-  // Третя категорія відображається в панелі, але тимчасово вимкнена.
   "3": {
     name: "🛩️ БПЛА (Розширений режим)",
     emoji: "🛩️",
@@ -587,7 +291,7 @@ const categories = {
     minZoom: 0,
     show: false,
     disabled: true
-  }
+  },
 
 };
 
@@ -595,78 +299,106 @@ const categories = {
    MAP
 ========================================================= */
 
+const UKRAINE_VIEW_BOUNDS = L.latLngBounds([[44.0, 21.0], [53.0, 41.0]]);
+
 const map =
   L.map("map", {
-    zoomControl: true
-  }).setView([47.60, 32.25], 7);
+    zoomControl: true,
+    maxBounds: UKRAINE_VIEW_BOUNDS,
+    maxBoundsViscosity: 0.92,
+    minZoom: 6
+  }).setView([48.38, 31.17], 6);
 
 /* =========================================================
    TILE
 ========================================================= */
 
-L.tileLayer(
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    maxZoom: 19,
-    attribution:
-      "© OpenStreetMap contributors"
-  }
-).addTo(map);
+// Темна картографічна підкладка CARTO.
+const CARTO_BASEMAP_KEY = "cb1_4p71_1_bc1eb1f9cdb46f6143101482";
+const CARTO_DARK_TILES = "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=" + CARTO_BASEMAP_KEY;
+
+L.tileLayer(CARTO_DARK_TILES, {
+  subdomains: "abcd",
+  maxZoom: 20,
+  attribution: "© OpenStreetMap contributors © CARTO"
+}).addTo(map);
 
 /* =========================================================
-   МАСКА ЗАТЕМНЕНИЯ СТРАН (КРОМЕ УКРАИНЫ)
+   МАСКА: ПОЗА МЕЖАМИ УКРАЇНИ — ТЕМНЕ ПОЛЕ
 ========================================================= */
+// Перевіряємо ISO-код та назви країни, щоб не затемнити Крим окремо від України.
+const WORLD_COUNTRIES_GEOJSON_URL = "https://cdn.jsdelivr.net/gh/datasets/geo-countries@main/data/countries.geojson";
+const ukraineOutlineLayer = L.layerGroup().addTo(map);
 
-// URL-адрес проверенного файла с геоданными границ всех стран мира
-const geojsonUrl = "https://cdn.jsdelivr.net/gh/datasets/geo-countries@main/data/countries.geojson";
-
-fetch(geojsonUrl, { cache: "force-cache" })
+fetch(WORLD_COUNTRIES_GEOJSON_URL)
   .then(response => {
-    if (!response.ok) throw new Error(`GeoJSON HTTP ${response.status}`);
+    if (!response.ok) throw new Error("Не вдалося завантажити межі країн");
     return response.json();
   })
   .then(data => {
-    L.geoJSON(data, {
-      style: function (feature) {
-        // GeoJSON datasets use different property names; check common ISO/name fields.
-        const props = feature.properties || {};
-        const countryName = String(
-          props.name || props.NAME || props.ADMIN || props.admin ||
-          props.name_en || props.NAME_EN || props.sovereignt || ""
-        ).trim().toLowerCase();
+    const features = Array.isArray(data.features) ? data.features : [];
+    const isUkraineFeature = feature => {
+      const props = feature && feature.properties ? feature.properties : {};
+      const iso = String(props["ISO3166-1-Alpha-3"] || props.ISO_A3 || props.iso_a3 || props.ADM0_A3 || "").trim().toUpperCase();
+      const name = String(props.name || props.NAME || props.ADMIN || props.admin || props.NAME_EN || "").trim().toLowerCase();
+      return iso === "UKR" || ["ukraine", "україна", "украина"].includes(name);
+    };
+    const ukraineFeature = features.find(isUkraineFeature);
+    const isRussiaFeature = feature => {
+      const props = feature && feature.properties ? feature.properties : {};
+      const iso = String(props["ISO3166-1-Alpha-3"] || props.ISO_A3 || props.iso_a3 || props.ADM0_A3 || "").trim().toUpperCase();
+      const name = String(props.name || props.NAME || props.ADMIN || props.admin || props.NAME_EN || "").trim().toLowerCase();
+      return iso === "RUS" || ["russia", "russian federation", "росія", "россия"].includes(name);
+    };
 
-        const countryIso3 = String(
-          props["ISO3166-1-Alpha-3"] || props.ISO_A3 || props.iso_a3 ||
-          props.ADM0_A3 || props.SOV_A3 || props.ISO3 || ""
-        ).trim().toUpperCase();
-        const countryIso2 = String(
-          props["ISO3166-1-Alpha-2"] || props.ISO_A2 || props.iso_a2 || props.ISO2 || ""
-        ).trim().toUpperCase();
-
-        const isUkraine =
-          countryIso3 === "UKR" || countryIso2 === "UA" ||
-          countryName === "ukraine" || countryName === "україна" ||
-          countryName === "украина";
-
-        if (isUkraine) {
-          return {
-            fillOpacity: 0,       // Украина остается полностью прозрачной (видна обычная карта)
-            color: "transparent", // Скрываем внешнюю программную границу (будет видна родная граница с тайлов)
-            weight: 0
-          };
-        } else {
-          return {
-            fillColor: "#121212", // Цвет затемнения для остальных стран (можно заменить на #000000)
-            fillOpacity: 0.75,    // Плотность маски (0.8 — темнее, 0.5 — светлее)
-            color: "#2c2c2c",     // Цвет линий границ между другими странами
-            weight: 1             // Толщина линий границ других стран
-          };
+    // У деяких світових наборах Крим помилково входить до геометрії Росії.
+    // Якщо він окремим полігоном у MultiPolygon, прибираємо саме цей полігон з маски.
+    const otherCountries = features
+      .filter(feature => !isUkraineFeature(feature))
+      .map(feature => {
+        if (!isRussiaFeature(feature) || !feature.geometry) return feature;
+        const geometry = feature.geometry;
+        const isCrimeaPolygon = ringSet => {
+          const ring = Array.isArray(ringSet) && Array.isArray(ringSet[0]) ? ringSet[0] : ringSet;
+          if (!Array.isArray(ring) || !ring.length) return false;
+          const xs = ring.map(point => point[0]).filter(Number.isFinite);
+          const ys = ring.map(point => point[1]).filter(Number.isFinite);
+          if (!xs.length || !ys.length) return false;
+          const minX = Math.min(...xs), maxX = Math.max(...xs);
+          const minY = Math.min(...ys), maxY = Math.max(...ys);
+          // Кримський півострів: полігон має повністю вкладатися в цей географічний діапазон.
+          return minX >= 32.0 && maxX <= 37.2 && minY >= 43.8 && maxY <= 47.0;
+        };
+        if (geometry.type === "MultiPolygon" && Array.isArray(geometry.coordinates)) {
+          const coordinates = geometry.coordinates.filter(poly => !isCrimeaPolygon(poly));
+          return { ...feature, geometry: { ...geometry, coordinates } };
         }
+        if (geometry.type === "Polygon" && isCrimeaPolygon(geometry.coordinates)) {
+          return null;
+        }
+        return feature;
+      })
+      .filter(Boolean);
+
+    // Інші держави затемнені. Російська геометрія не повинна накривати Крим.
+    L.geoJSON({ type: "FeatureCollection", features: otherCountries }, {
+      interactive: false,
+      style: {
+        color: "#090d13", weight: 1, opacity: 0.95,
+        fillColor: "#05080d", fillOpacity: 0.94
       }
     }).addTo(map);
-  })
-  .catch(error => console.error("Ошибка загрузки границ стран:", error));
 
+    if (ukraineFeature) {
+      L.geoJSON(ukraineFeature, {
+        interactive: false,
+        style: { color: "#62a9ff", weight: 2, opacity: 0.95, fillOpacity: 0 }
+      }).addTo(ukraineOutlineLayer);
+    } else {
+      console.warn("У GeoJSON не знайдено Україну за ISO-кодом UKR");
+    }
+  })
+  .catch(error => console.warn("Маска меж України недоступна:", error));
 
 /* =========================================================
    LAYERS
@@ -676,6 +408,9 @@ const sheetLayerGroup =
   L.layerGroup().addTo(map);
 
 const neptunThreatLayerGroup =
+  L.layerGroup().addTo(map);
+
+const mapaThreatLayerGroup =
   L.layerGroup().addTo(map);
 
 const neptunRaionLayerGroup =
@@ -692,6 +427,8 @@ let sheetObjects = [];
 
 let neptunThreats = [];
 
+let mapaThreats = [];
+
 let neptunAlerts = [];
 
 let neptunAlertOblasts = [];
@@ -701,665 +438,17 @@ let raionsGeoJSON = null;
 let oblastsGeoJSON = null;
 
 /* =========================================================
-   OFFLINE INDEXEDDB
+   NO PERSISTENT CACHE
 ========================================================= */
 
-/*
- * У IndexedDB зберігаємо весь стан карти.
- *
- * Це важливо:
- *
- * Google Sheets
- * NEPTUN threats
- * NEPTUN alerts
- * GeoJSON
- *
- * після успішного онлайн-завантаження залишаються
- * доступними навіть після повного закриття браузера.
- */
-
-const OFFLINE_DB_NAME =
-  "MapaPodiyUA_Offline";
-
-const OFFLINE_DB_VERSION = 1;
-
-const OFFLINE_STORE_NAME =
-  "mapCache";
-
-const OFFLINE_CACHE_KEY =
-  "state";
-
-/*
- * MOBILE FALLBACK
- *
- * Деякі мобільні браузери/режими можуть блокувати або
- * ламати IndexedDB. Тому маємо другий незалежний кеш.
- */
-const OFFLINE_LOCAL_KEY =
-  "MapaPodiyUA_Offline_v2";
-
-let offlineDBPromise = null;
-
-let offlineCacheSavedAt = 0;
-
-let offlineCacheLoaded = false;
-
-let offlineWriteQueue =
-  Promise.resolve();
-
-/* =========================================================
-   OPEN INDEXEDDB
-========================================================= */
-
-function openOfflineDB() {
-
-  if (offlineDBPromise) {
-    return offlineDBPromise;
-  }
-
-  offlineDBPromise =
-    new Promise((resolve, reject) => {
-
-      if (!("indexedDB" in window)) {
-
-        reject(
-          new Error(
-            "IndexedDB не підтримується браузером"
-          )
-        );
-
-        return;
-      }
-
-      const request =
-        indexedDB.open(
-          OFFLINE_DB_NAME,
-          OFFLINE_DB_VERSION
-        );
-
-      request.onupgradeneeded =
-        function(event) {
-
-          const db =
-            event.target.result;
-
-          if (
-            !db.objectStoreNames.contains(
-              OFFLINE_STORE_NAME
-            )
-          ) {
-
-            db.createObjectStore(
-              OFFLINE_STORE_NAME
-            );
-
-          }
-
-        };
-
-      request.onsuccess =
-        function(event) {
-
-          const db =
-            event.target.result;
-
-          // db.onversionchange =
-          //   function() {
-
-          //     db.close();
-
-          //   };
-
-          resolve(db);
-
-        };
-
-      request.onerror =
-        function() {
-
-          reject(
-            request.error ||
-            new Error(
-              "Не вдалося відкрити IndexedDB"
-            )
-          );
-
-        };
-
-    });
-
-  return offlineDBPromise;
-
-}
-
-/* =========================================================
-   SAVE OFFLINE STATE
-========================================================= */
-
-function saveOfflineState() {
-
-  offlineWriteQueue =
-    offlineWriteQueue
-      .then(async () => {
-
-        const state = {
-
-          version:
-            OFFLINE_DB_VERSION,
-
-          savedAt:
-            Date.now(),
-
-          sheetObjects:
-            Array.isArray(sheetObjects)
-              ? sheetObjects
-              : [],
-
-          neptunThreats:
-            Array.isArray(neptunThreats)
-              ? neptunThreats
-              : [],
-
-          neptunAlerts:
-            Array.isArray(neptunAlerts)
-              ? neptunAlerts
-              : [],
-
-          neptunAlertOblasts:
-            Array.isArray(neptunAlertOblasts)
-              ? neptunAlertOblasts
-              : [],
-
-          raionsGeoJSON:
-            raionsGeoJSON || null,
-
-          oblastsGeoJSON:
-            oblastsGeoJSON || null
-
-        };
-
-        let saved = false;
-
-        /*
-         * 1. Основний кеш — IndexedDB.
-         */
-        try {
-
-          const db =
-            await openOfflineDB();
-
-          await new Promise(
-            (resolve, reject) => {
-
-              const transaction =
-                db.transaction(
-                  OFFLINE_STORE_NAME,
-                  "readwrite"
-                );
-
-              const store =
-                transaction.objectStore(
-                  OFFLINE_STORE_NAME
-                );
-
-              const request =
-                store.put(
-                  state,
-                  OFFLINE_CACHE_KEY
-                );
-
-              request.onsuccess =
-                () => resolve();
-
-              request.onerror =
-                () => reject(
-                  request.error ||
-                  new Error(
-                    "IndexedDB put error"
-                  )
-                );
-
-              transaction.onerror =
-                () => reject(
-                  transaction.error ||
-                  new Error(
-                    "IndexedDB transaction error"
-                  )
-                );
-
-            }
-          );
-
-          saved = true;
-
-          console.log(
-            "OFFLINE: IndexedDB збережено"
-          );
-
-        } catch (error) {
-
-          console.warn(
-            "OFFLINE: IndexedDB save failed:",
-            error
-          );
-
-        }
-
-        /*
-         * 2. Дубльований fallback — localStorage.
-         *
-         * Це особливо важливо для мобільних браузерів.
-         */
-        try {
-
-          localStorage.setItem(
-            OFFLINE_LOCAL_KEY,
-            JSON.stringify(state)
-          );
-
-          saved = true;
-
-          console.log(
-            "OFFLINE: localStorage збережено"
-          );
-
-        } catch (error) {
-
-          console.warn(
-            "OFFLINE: localStorage save failed:",
-            error
-          );
-
-        }
-
-        if (saved) {
-
-          offlineCacheSavedAt =
-            state.savedAt;
-
-          offlineCacheLoaded =
-            true;
-
-          updateStatus();
-
-        } else {
-
-          throw new Error(
-            "Не вдалося зберегти кеш ні в IndexedDB, ні в localStorage"
-          );
-
-        }
-
-      })
-      .catch(error => {
-
-        console.warn(
-          "OFFLINE: помилка збереження:",
-          error
-        );
-
-        updateStatus();
-
-      });
-
-  return offlineWriteQueue;
-
-}
-
-/* =========================================================
-   LOAD OFFLINE STATE
-========================================================= */
-
-async function loadOfflineState() {
-
-  /*
-   * Спочатку пробуємо IndexedDB.
-   */
-  try {
-
-    const db =
-      await openOfflineDB();
-
-    const state =
-      await new Promise(
-        (resolve, reject) => {
-
-          const transaction =
-            db.transaction(
-              OFFLINE_STORE_NAME,
-              "readonly"
-            );
-
-          const store =
-            transaction.objectStore(
-              OFFLINE_STORE_NAME
-            );
-
-          const request =
-            store.get(
-              OFFLINE_CACHE_KEY
-            );
-
-          request.onsuccess =
-            () => resolve(
-              request.result || null
-            );
-
-          request.onerror =
-            () => reject(
-              request.error ||
-              new Error(
-                "IndexedDB get error"
-              )
-            );
-
-        }
-      );
-
-    if (
-      state &&
-      state.version ===
-        OFFLINE_DB_VERSION
-    ) {
-
-      console.log(
-        "OFFLINE: кеш знайдено в IndexedDB"
-      );
-
-      return state;
-
-    }
-
-  } catch (error) {
-
-    console.warn(
-      "OFFLINE: IndexedDB read failed:",
-      error
-    );
-
-  }
-
-  /*
-   * Якщо IndexedDB недоступний або порожній —
-   * пробуємо localStorage.
-   */
-  try {
-
-    const raw =
-      localStorage.getItem(
-        OFFLINE_LOCAL_KEY
-      );
-
-    if (!raw) {
-
-      console.log(
-        "OFFLINE: localStorage кеш відсутній"
-      );
-
-      return null;
-
-    }
-
-    const state =
-      JSON.parse(raw);
-
-    if (
-      !state ||
-      state.version !==
-        OFFLINE_DB_VERSION
-    ) {
-
-      console.warn(
-        "OFFLINE: localStorage кеш іншої версії"
-      );
-
-      return null;
-
-    }
-
-    console.log(
-      "OFFLINE: кеш знайдено в localStorage"
-    );
-
-    return state;
-
-  } catch (error) {
-
-    console.warn(
-      "OFFLINE: localStorage read failed:",
-      error
-    );
-
-  }
-
-  return null;
-
-}
-
-/* =========================================================
-   FORMAT CACHE AGE
-========================================================= */
-
-function formatCacheAge(timestamp) {
-
-  if (
-    !timestamp ||
-    !Number.isFinite(
-      Number(timestamp)
-    )
-  ) {
-
-    return "невідомо";
-
-  }
-
-  const diff =
-    Math.max(
-      0,
-      Date.now() -
-      Number(timestamp)
-    );
-
-  const seconds =
-    Math.floor(
-      diff / 1000
-    );
-
-  if (seconds < 60) {
-
-    return (
-      seconds +
-      " сек. тому"
-    );
-
-  }
-
-  const minutes =
-    Math.floor(
-      seconds / 60
-    );
-
-  if (minutes < 60) {
-
-    return (
-      minutes +
-      " хв. тому"
-    );
-
-  }
-
-  const hours =
-    Math.floor(
-      minutes / 60
-    );
-
-  if (hours < 24) {
-
-    return (
-      hours +
-      " год. тому"
-    );
-
-  }
-
-  const days =
-    Math.floor(
-      hours / 24
-    );
-
-  return (
-    days +
-    " дн. тому"
-  );
-
-}
-
-/* =========================================================
-   RESTORE OFFLINE STATE
-========================================================= */
-
-async function restoreOfflineState() {
-
-  const state =
-    await loadOfflineState();
-
-  if (!state) {
-
-    return false;
-
-  }
-
-  /*
-   * Перевіряємо кожне поле окремо.
-   *
-   * Це захищає від пошкодженого/неповного кешу.
-   */
-
-  if (
-    Array.isArray(
-      state.sheetObjects
-    )
-  ) {
-
-    sheetObjects =
-      state.sheetObjects;
-
-  }
-
-  if (
-    Array.isArray(
-      state.neptunThreats
-    )
-  ) {
-
-    neptunThreats =
-      state.neptunThreats;
-
-  }
-
-  if (
-    Array.isArray(
-      state.neptunAlerts
-    )
-  ) {
-
-    neptunAlerts =
-      state.neptunAlerts;
-
-  }
-
-  if (
-    Array.isArray(
-      state.neptunAlertOblasts
-    )
-  ) {
-
-    neptunAlertOblasts =
-      state.neptunAlertOblasts;
-
-  }
-
-  if (
-    state.raionsGeoJSON &&
-    typeof state.raionsGeoJSON ===
-      "object"
-  ) {
-
-    raionsGeoJSON =
-      state.raionsGeoJSON;
-
-  }
-
-  if (
-    state.oblastsGeoJSON &&
-    typeof state.oblastsGeoJSON ===
-      "object"
-  ) {
-
-    oblastsGeoJSON =
-      state.oblastsGeoJSON;
-
-  }
-
-  offlineCacheSavedAt =
-    Number(state.savedAt) || 0;
-
-  offlineCacheLoaded = true;
-
-  /*
-   * Спочатку відновлюємо кешовану карту.
-   */
-
-  renderSheetObjects();
-
-  renderNeptunThreats();
-
-  renderAlertZones();
-
-  updateVisibility();
-
-  updateAlertBadge();
-
-  updateCategoryCounts();
-
-  updateStatus();
-
-  console.log(
-    "OFFLINE: кеш відновлено",
-    state
-  );
-
-  return true;
-
-}
-
-/* =========================================================
-   OFFLINE STATUS
-========================================================= */
-
-function getOfflineStatusText() {
-
-  if (!offlineCacheLoaded) {
-
-    return "Офлайн: збережених даних немає";
-
-  }
-
-  if (offlineCacheSavedAt) {
-
-    return (
-      "Офлайн: показано збережені дані<br>" +
-      "Кеш: " +
-      formatCacheAge(
-        offlineCacheSavedAt
-      )
-    );
-
-  }
-
-  return "Офлайн: показано збережені дані";
-
-}
+// Clean up data saved by older versions. Current page data stays in memory only.
+try {
+  localStorage.removeItem("MapaPodiyUA_Offline_v2");
+  localStorage.removeItem("MapaPodiyUA_customThreats_v1");
+} catch (_) {}
+try {
+  if (window.indexedDB) indexedDB.deleteDatabase("MapaPodiyUA_Offline");
+} catch (_) {}
 
 /* =========================================================
    ONLINE / OFFLINE EVENTS
@@ -1390,12 +479,14 @@ window.addEventListener(
 
     
 
-    loadNeptunAlerts();
+    runPollOnce("neptun-alerts", loadNeptunAlerts);
     
 
-    loadNeptunThreats();
+    runPollOnce("neptun-threats", loadNeptunThreats);
 
-    loadNeptunGeoJSON();
+    runPollOnce("mapa-threats", loadMapaThreats);
+
+    runPollOnce("neptun-geojson", loadNeptunGeoJSON);
 
     if (
       !neptunRealtimeClient
@@ -1564,25 +655,21 @@ function createCategoryPanel() {
         "checkbox";
 
       checkbox.checked =
-        Boolean(visibleCategories[id]);
+        visibleCategories[id];
 
-      checkbox.disabled = category.disabled === true;
-      checkbox.dataset.category = id;
-
-      if (checkbox.disabled) {
-        checkbox.title = "Ця категорія тимчасово недоступна";
-        row.classList.add("category-disabled");
-        row.setAttribute("aria-disabled", "true");
+      checkbox.disabled = Boolean(category.disabled);
+      if (category.disabled) {
+        row.classList.add("is-disabled");
+        row.title = "Цю категорію тимчасово вимкнено";
+        checkbox.setAttribute("aria-label", category.name + " — вимкнено");
       }
+
+      checkbox.dataset.category =
+        id;
 
       checkbox.addEventListener(
         "change",
         function() {
-
-          if (category.disabled === true) {
-            this.checked = false;
-            return;
-          }
 
           visibleCategories[id] =
             this.checked;
@@ -1709,7 +796,7 @@ function createEmojiIcon(
 
 function createNeptunThreatIcon(
   type,
-  rotate = 45
+  rotate = 0
 ) {
 
   const normalizedType =
@@ -1732,22 +819,23 @@ function createNeptunThreatIcon(
 
   const rotation =
     shouldRotate && rotate != null
-      ? rotate - 45
+      ? rotate
       : 0;
 
   return L.divIcon({
 
-    className: "neptun-threat-icon",
+    className: normalizedType === "all" ?"neptun-threat-icon red": "neptun-threat-icon",
 
     html: `\n      <div
-        class="neptun-threat-marker"
+        class="neptun-threat-marker${iconFile === "all.png" ?" redLevel":
+        ""}"
         style="transform: rotate(${rotation}deg);"
       >
         <img
           src="./icon/${iconFile}"
           alt=""
           draggable="false"
-          style="width:34px;height:34px;object-fit:contain;display:block;"
+          style="width:46px;height:46px;object-fit:contain;display:block;"
           onerror="this.onerror=null;this.src='./icon/.png';"
         >
       </div>
@@ -1758,6 +846,326 @@ function createNeptunThreatIcon(
     iconAnchor: [19, 19]
 
   });
+
+}
+
+/* =========================================================
+   MAPA.UA THREATS
+========================================================= */
+
+function getMapaThreatKind(threat) {
+  return normalizeType(
+    threat?.kind ||
+    threat?.subkind ||
+    threat?.type
+  );
+}
+
+function getMapaThreatTitle(threat) {
+  const kind = getMapaThreatKind(threat);
+
+  const titles = {
+    drone_piston: "БпЛА Shahed / поршневий",
+    drone_jet: "БпЛА реактивний",
+    missile_cruise: "Крилата ракета",
+    missile_ballistic: "Балістична ракета",
+    bomb_glide: "Керована авіабомба",
+    bomb: "Авіабомба"
+  };
+
+  if (titles[kind]) {
+    return titles[kind];
+  }
+
+  if (threat?.title) {
+    return String(threat.title);
+  }
+
+  if (threat?.kind) {
+    return String(threat.kind);
+  }
+
+  return "Повітряна загроза";
+}
+
+function getMapaThreatIconFile(threat) {
+  const kind = getMapaThreatKind(threat);
+
+  if (
+    kind === "drone_piston" ||
+    kind === "drone_jet" ||
+    kind === "uav" ||
+    kind === "drone"
+  ) {
+    return "uav.png";
+  }
+  if(kind === "drone_fpv")
+    return "fpv.png"
+
+  return "all.png";
+}
+
+function createMapaThreatIcon(threat, rotate = 0) {
+  const kind = getMapaThreatKind(threat);
+  const iconFile =
+    getMapaThreatIconFile(threat);
+
+  const rotation =
+    Number.isFinite(Number(rotate))
+      ? Number(rotate)
+      : 0;
+
+    
+  return L.divIcon({
+    className: kind === "drone_jet" ? "neptun-threat-icon redLevel": "neptun-threat-icon",
+
+    html: `
+      <div
+        class="neptun-threat-marker${kind === "drone_jet" || iconFile ==="all.png" ?" redLevel":
+        ""}"
+        ${kind !== "drone_fpv"? `style=\"transform: rotate(${rotation}deg);\"` : ""}
+      >
+        <img
+          src="./icon/${iconFile}"
+          alt=""
+          draggable="false"
+          style="width:46px;height:46px;object-fit:contain;display:block;"
+          onerror="this.onerror=null;this.src='./icon/all.png';"
+        >
+      </div>
+    `,
+
+    iconSize: [38, 38],
+    iconAnchor: [19, 19]
+  });
+}
+
+function renderMapaThreats() {
+  const openKey =
+    rememberMapaThreatPopup();
+
+  mapaThreatLayerGroup.clearLayers();
+
+  mapaThreats.forEach(
+    threat => {
+
+      const lat =
+        Number(threat?.lat);
+
+      const lng =
+        Number(
+          threat?.lon ??
+          threat?.lng
+        );
+
+      if (
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng)
+      ) {
+        return;
+      }
+
+      const marker =
+        L.marker(
+          [lat, lng],
+          {
+            icon:
+              createMapaThreatIcon(
+                threat,
+                threat?.heading
+              )
+          }
+        );
+
+      marker._threatPopupKey =
+        "mapa:" +
+        String(
+          threat?.id ??
+          (lat + ":" + lng)
+        );
+
+      marker._category =
+        MAPA_CATEGORY_THREAT;
+
+      marker._mapaThreat = true;
+
+      const title =
+        getMapaThreatTitle(threat);
+
+      const kind =
+        getMapaThreatKind(threat);
+
+      const speed =
+        threat?.speed_kmh != null
+          ? String(threat.speed_kmh) + " км/год"
+          : "Невідомо";
+
+      const heading =
+        threat?.heading != null
+          ? String(threat.heading) + "°"
+          : "Невідомо";
+
+      const destination =
+        threat?.title
+          ? String(threat.title)
+          : "";
+
+      const amount =
+        threat?.amount != null
+          ? String(threat.amount)
+          : "";
+
+      marker.bindPopup(
+        `
+        <div style="font-size:18px;line-height:1.35;">
+          <b>Помічена повітряна загроза</b>
+          ${
+            kind
+              ? `<br>Тип: ${title}`
+              : ""
+          }
+
+          <br>
+          Курс: ${heading}
+
+          ${
+            amount
+              ? `<br>${destination}`
+              : ""
+          }
+          
+        </div>
+
+        <div style="font-size:13px !important;line-height:1.35;">
+          <br>
+          Дані зібрано з
+          <a
+            style="font-size:13px !important;"
+            href="https://mapa.ua/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            MAPA.UA
+          </a>
+          <br><i style="font-size:13px !important;">P.S. : Ці дані від MAPA.UA від може буди недійсним, тому викоритовуйте другі варіанти</i>
+        </div>
+        
+        `
+      );
+
+      marker.addTo(
+        mapaThreatLayerGroup
+      );
+    }
+  );
+
+  restoreMapaThreatPopup(openKey);
+  updateVisibility();
+}
+
+function rememberMapaThreatPopup() {
+  let key = null;
+
+  mapaThreatLayerGroup.eachLayer(
+    layer => {
+
+      if (
+        !key &&
+        typeof layer.isPopupOpen === "function" &&
+        layer.isPopupOpen()
+      ) {
+        key =
+          layer._threatPopupKey ??
+          null;
+      }
+
+    }
+  );
+
+  return key;
+}
+
+function restoreMapaThreatPopup(key) {
+  if (!key) {
+    return;
+  }
+
+  mapaThreatLayerGroup.eachLayer(
+    layer => {
+
+      if (
+        layer._threatPopupKey === key &&
+        typeof layer.openPopup === "function"
+      ) {
+        layer.openPopup();
+      }
+
+    }
+  );
+}
+
+async function loadMapaThreats() {
+
+  try {
+
+    const response =
+      await fetch(
+        getMapaThreatsURL(),
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "HTTP " +
+        response.status
+      );
+    }
+
+    const data =
+      await response.json();
+
+    const objects =
+      Array.isArray(data?.objects)
+        ? data.objects
+        : [];
+
+    mapaThreats =
+      objects.filter(
+        threat =>
+          threat &&
+          String(
+            threat.status || ""
+          ).toLowerCase() === "active" &&
+          Number.isFinite(
+            Number(threat.lat)
+          ) &&
+          Number.isFinite(
+            Number(
+              threat.lon ??
+              threat.lng
+            )
+          )
+      );
+
+    renderMapaThreats();
+
+    updateCategoryCounts();
+    updateStatus();
+
+    console.debug("MAPA.UA threats updated:", mapaThreats.length);
+
+  } catch (error) {
+
+    console.error(
+      "MAPA.UA threats:",
+      error
+    );
+
+    updateStatus();
+
+  }
 
 }
 
@@ -1874,13 +1282,22 @@ function renderSheetObjects() {
                   category.color,
 
                 weight:
-                  3,
+                  2.5,
+
+                opacity:
+                  0.98,
 
                 fillColor:
                   category.color,
 
                 fillOpacity:
-                  0.18
+                  0.32,
+
+                lineCap:
+                  "round",
+
+                lineJoin:
+                  "round"
 
               }
 
@@ -2099,6 +1516,15 @@ function updateVisibility() {
   );
 
   /*
+   * MAPA UAV / threats
+   */
+  if (visibleCategories[MAPA_CATEGORY_THREAT]) {
+    if (!map.hasLayer(mapaThreatLayerGroup)) map.addLayer(mapaThreatLayerGroup);
+  } else {
+    if (map.hasLayer(mapaThreatLayerGroup)) map.removeLayer(mapaThreatLayerGroup);
+  }
+
+  /*
    * NEPTUN UAV / threats
    */
 
@@ -2262,6 +1688,13 @@ function updateCategoryCounts() {
 
     }
   );
+
+  /*
+   * MAPA UAV
+   */
+  mapaThreats.forEach(() => {
+    if (counts[MAPA_CATEGORY_THREAT] !== undefined) counts[MAPA_CATEGORY_THREAT]++;
+  });
 
   /*
    * NEPTUN air alerts
@@ -2462,254 +1895,320 @@ function getAlertStyle(
   alert,
   isOblast
 ) {
+  const level = String(alert?.level || "red").toLowerCase();
+  const isYellow = level === "yellow" || level === "amber";
+  const color = isYellow ? "#f5b82e" : "#ff3448";
 
-  const level =
-    String(
-      alert?.level || ""
-    ).toLowerCase();
-
-  /*
-   * RED = active official red alert
-   */
-
-  if (
-    level === "red"
-  ) {
-
-    return {
-
-      color:
-        "#cc0000",
-
-      weight:
-        isOblast
-          ? 5
-          : 3,
-
-      opacity:
-        1,
-
-      fillColor:
-        "#ff0000",
-
-      fillOpacity:
-        isOblast
-          ? 0.65
-          : 0.78
-
-    };
-
-  }
-
-  /*
-   * YELLOW = yellow alert
-   */
-
-  if (
-    level === "yellow"
-  ) {
-
-    return {
-
-      color:
-        "#cc9900",
-
-      weight:
-        isOblast
-          ? 5
-          : 3,
-
-      opacity:
-        1,
-
-      fillColor:
-        "#ffcc00",
-
-      fillOpacity:
-        isOblast
-          ? 0.65
-          : 0.78
-
-    };
-
-  }
-
-  /*
-   * fallback
-   */
-
+  // Чёткие административные контуры без тяжёлой заливки,
+  // из-за которой соседние полигоны выглядят как один кривой блок.
   return {
-
-    color:
-      "#ff0000",
-
-    weight:
-      3,
-
-    opacity:
-      1,
-
-    fillColor:
-      "#ff0000",
-
-    fillOpacity:
-      0.18
-
+    color: isYellow ? "#ffd166" : "#ff5a68",
+    weight: isOblast ? 2.4 : 1.25,
+    opacity: isOblast ? 0.98 : 0.92,
+    lineCap: "round",
+    lineJoin: "round",
+    fillColor: color,
+    fillOpacity: isOblast ? 0.10 : 0.34,
+    smoothFactor: 0.35,
+    interactive: false
   };
-
 }
 
 /* =========================================================
    LOAD NEPTUN GEOJSON
 ========================================================= */
 
-async function loadNeptunGeoJSON() {
+function geoNameToSlug(value) {
+  const transliteration = {
+    "а":"a","б":"b","в":"v","г":"h","ґ":"g","д":"d","е":"e","є":"ye",
+    "ж":"zh","з":"z","и":"y","і":"i","ї":"yi","й":"y","к":"k","л":"l",
+    "м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f",
+    "х":"kh","ц":"ts","ч":"ch","ш":"sh","щ":"shch","ь":"","ю":"yu","я":"ya",
+    "ы":"y","э":"e","ё":"yo","'":"","ʼ":"","’":"","`":""
+  };
+  return String(value || "")
+    .toLowerCase()
+    .split("")
+    .map(ch => transliteration[ch] !== undefined ? transliteration[ch] : ch)
+    .join("")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
 
-  try {
-
-    const [
-      raionResponse,
-      oblastResponse
-    ] = await Promise.all([
-
-      fetch(
-        RAIONS_GEOJSON_URL +
-        "?t=" +
-        Date.now(),
-        {
-          cache:
-            "no-store"
-        }
-      ),
-
-      fetch(
-        OBLASTS_GEOJSON_URL +
-        "?t=" +
-        Date.now(),
-        {
-          cache:
-            "no-store"
-        }
-      )
-
-    ]);
-
-    if (
-      !raionResponse.ok
-    ) {
-
-      throw new Error(
-        "Raions GeoJSON HTTP " +
-        raionResponse.status
-      );
-
-    }
-
-    if (
-      !oblastResponse.ok
-    ) {
-
-      throw new Error(
-        "Oblasts GeoJSON HTTP " +
-        oblastResponse.status
-      );
-
-    }
-
-    const newRaionsGeoJSON =
-      await raionResponse.json();
-
-    const newOblastsGeoJSON =
-      await oblastResponse.json();
-
-    /*
-     * Перевіряємо структуру,
-     * щоб не перезаписати кеш
-     * битим JSON.
-     */
-
-    if (
-      !newRaionsGeoJSON ||
-      typeof newRaionsGeoJSON !==
-        "object" ||
-      !Array.isArray(
-        newRaionsGeoJSON.features
-      )
-    ) {
-
-      throw new Error(
-        "Некоректний GeoJSON районів"
-      );
-
-    }
-
-    if (
-      !newOblastsGeoJSON ||
-      typeof newOblastsGeoJSON !==
-        "object" ||
-      !Array.isArray(
-        newOblastsGeoJSON.features
-      )
-    ) {
-
-      throw new Error(
-        "Некоректний GeoJSON областей"
-      );
-
-    }
-
-    /*
-     * Лише тепер замінюємо поточні
-     * GeoJSON.
-     */
-
-    raionsGeoJSON =
-      newRaionsGeoJSON;
-
-    oblastsGeoJSON =
-      newOblastsGeoJSON;
-
-    console.log(
-      "GeoJSON районів завантажено"
-    );
-
-    console.log(
-      "GeoJSON областей завантажено"
-    );
-
-    renderAlertZones();
-
-    /*
-     * GeoJSON успішно отримані —
-     * зберігаємо їх у кеш.
-     */
-
-    await saveOfflineState();
-
-    updateStatus();
-
-  } catch (error) {
-
-    console.error(
-      "GeoJSON NEPTUN:",
-      error
-    );
-
-    /*
-     * Старий GeoJSON залишається.
-     */
-
-    renderAlertZones();
-
-    updateStatus();
-
+async function fetchGeoJSON(url) {
+  const response = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), {
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error("GeoJSON HTTP " + response.status + ": " + url);
+  const data = await response.json();
+  if (!data || typeof data !== "object" || !Array.isArray(data.features)) {
+    throw new Error("Некоректний GeoJSON: " + url);
   }
+  return data;
+}
 
+async function loadNeptunGeoJSON() {
+  try {
+    // Сначала загружаем настоящие контуры областей Украины.
+    const newOblastsGeoJSON = await fetchGeoJSON(OBLASTS_GEOJSON_URL);
+
+    // Затем — отдельные наборы районов каждой области. Это заменяет старый
+    // общий файл с несовпадающими/устаревшими геометриями.
+    const oblastFeatures = newOblastsGeoJSON.features;
+    const districtResults = await Promise.allSettled(
+      oblastFeatures.map(async feature => {
+        const props = feature?.properties || {};
+        const name = typeof props.name === "string"
+          ? props.name
+          : (typeof props.NAME_1 === "string" ? props.NAME_1 : "");
+        if (!name) return [];
+        const slug = geoNameToSlug(name);
+        if (!slug) return [];
+        const districtGeoJSON = await fetchGeoJSON(GEOJSON_BASE_URL + "/" + slug + ".geojson");
+        return districtGeoJSON.features || [];
+      })
+    );
+
+    const allDistrictFeatures = [];
+    let successfulRegionFiles = 0;
+    districtResults.forEach(result => {
+      if (result.status === "fulfilled") {
+        successfulRegionFiles++;
+        allDistrictFeatures.push(...result.value);
+      } else {
+        console.warn("Не вдалося завантажити GeoJSON районів області:", result.reason);
+      }
+    });
+
+    if (!newOblastsGeoJSON.features.length) {
+      throw new Error("GeoJSON областей не містить об’єктів");
+    }
+    if (successfulRegionFiles === 0 || allDistrictFeatures.length === 0) {
+      throw new Error("Не вдалося завантажити GeoJSON районів жодної області");
+    }
+
+    raionsGeoJSON = {
+      type: "FeatureCollection",
+      features: allDistrictFeatures
+    };
+    oblastsGeoJSON = newOblastsGeoJSON;
+
+    // Окремо підсвічуємо межу АР Крим та Севастополя незалежно від наявності тривоги.
+    // Шар містить лише контури, тому не перекриває кольори актуальних тривог.
+    if (window.crimeaOutlineLayer) {
+      window.crimeaOutlineLayer.clearLayers();
+    } else {
+      window.crimeaOutlineLayer = L.layerGroup().addTo(map);
+    }
+    const isCrimeaOrSevastopol = feature => {
+      const p = feature && feature.properties ? feature.properties : {};
+      const n = String(p.name || p.NAME_1 || p.NAME || p.admin1Name || p.shapeName || "").toLowerCase();
+      return n.includes("крим") || n.includes("crimea") || n.includes("sevastopol") || n.includes("севастоп") || n.includes("севастополь");
+    };
+    newOblastsGeoJSON.features.filter(isCrimeaOrSevastopol).forEach(feature => {
+      L.geoJSON(feature, {
+        interactive: false,
+        style: { color: "#65c7ff", weight: 2.8, opacity: 1, fillOpacity: 0 }
+      }).addTo(window.crimeaOutlineLayer);
+    });
+
+    console.log("GeoJSON областей завантажено:", oblastsGeoJSON.features.length);
+    console.log("GeoJSON районов загружено:", raionsGeoJSON.features.length,
+      "из", successfulRegionFiles, "файлов областей");
+
+    renderAlertZones();
+    updateStatus();
+  } catch (error) {
+    console.error("GeoJSON NEPTUN:", error);
+    // Если новая геометрия не загрузилась, показуємо лише дані поточного сеансу.
+    renderAlertZones();
+    updateStatus();
+  }
 }
 
 /* =========================================================
    RENDER ALERT ZONES
 ========================================================= */
+
+
+/* =========================================================
+   CURRENT THREATS BY OBLAST
+   Data source: AirThreatMap alarm.json
+========================================================= */
+const CUSTOM_THREATS_URL = "https://eso-net-live.github.io/AirThreatMap/alarm.json";
+let customThreats = [];
+const mapHistoryDialog = document.getElementById("mapHistory");
+const mapHistoryBody = document.getElementById("mapHistoryBody");
+const mapHistoryTitle = document.getElementById("map-history-title");
+document.getElementById("mapHistoryClose").addEventListener("click", () => mapHistoryDialog.close());
+mapHistoryDialog.addEventListener("click", event => {
+  if (event.target === mapHistoryDialog) mapHistoryDialog.close();
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && mapHistoryDialog.open) mapHistoryDialog.close();
+});
+function safeThreatText(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, ch => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+  }[ch]));
+}
+function threatLevelInfo(level) {
+  const n = Number(level);
+  if (Number.isFinite(n)) {
+    if (n >= 5) return {kind:"red", label:"Червоний рівень"};
+    if (n >= 3) return {kind:"yellow", label:"Жовтий рівень"};
+    return {kind:"neutral", label:"Інший статус"};
+  }
+  const value = String(level || "").toLowerCase();
+  if (/red|червон/.test(value)) return {kind:"red", label:"Червоний рівень"};
+  if (/yellow|amber|жовт/.test(value)) return {kind:"yellow", label:"Жовтий рівень"};
+  return {kind:"neutral", label:value ? "Рівень: " + String(level) : "Рівень не вказано"};
+}
+function normalizeAreaName(value) {
+  return normalizeName(String(value || "")
+    .replace(/\b(область|обл\.|район|районі)\b/gi, "")
+    .replace(/[^а-яіїєґa-z0-9]/gi, ""));
+}
+function threatsForOblast(oblastName) {
+  const needle = normalizeAreaName(oblastName);
+  return customThreats.filter(item => {
+    const target = normalizeAreaName(item.oblast || item.name || "");
+    return target && (target === needle || target.includes(needle) || needle.includes(target));
+  });
+}
+function formatThreatSince(value) {
+  if (!value || value === "-") return "Час початку не вказано";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return safeThreatText(value);
+  return date.toLocaleString("uk-UA", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
+}
+function getNeptunAreaItems(oblastName) {
+  const needle = normalizeAreaName(oblastName);
+  const source = [
+    ...neptunAlertOblasts.map(item => ({...item, _source:"NEPTUN", _isAlert:true})),
+    ...neptunAlerts.map(item => ({...item, _source:"NEPTUN", _isAlert:true}))
+  ];
+  return source.filter(item => {
+    const candidates = [
+      item.oblast, item.oblastName, item.region, item.regionName,
+      item.admin1, item.admin1Name, item.area, item.name
+    ].filter(Boolean);
+    return candidates.some(value => {
+      const target = normalizeAreaName(value);
+      return target && (target === needle || (target.length > 5 && needle.includes(target)));
+    });
+  });
+}
+function customColorForOblast(oblastName) {
+  const needle = normalizeAreaName(oblastName);
+  const item = customThreats.find(entry => {
+    const target = normalizeAreaName(entry.oblast || entry.name || "");
+    return target && (target === needle || target.includes(needle) || needle.includes(target));
+  });
+  // Низький рівень не фарбує карту; кастомний колір застосовується лише при level > 1.
+  if (!item || !(Number(item.level) > 1)) return null;
+  const color = String(item.color || "").trim();
+  return /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(color) ? color : null;
+}
+function showAreaHistory(name) {
+  mapHistoryTitle.textContent = name;
+  const customItems = threatsForOblast(name).map(item => ({...item, _source:"CUSTOM"}));
+  const neptunItems = getNeptunAreaItems(name);
+  const items = [...neptunItems, ...customItems];
+  if (!items.length) {
+    mapHistoryBody.innerHTML = '<div class="mapHistory__empty">Для цієї області зараз немає активних загроз.</div><p class="history-hint">Дані оновлюються автоматично. Завжди орієнтуйся також на офіційні сповіщення.</p>';
+  } else {
+    mapHistoryBody.innerHTML = '<section class="mapHistory__day"><h3>Активні загрози · ' + items.length + '</h3>' +
+      items.map(item => {
+        const custom = item._source === "CUSTOM";
+        const level = threatLevelInfo(item.level);
+        const title = safeThreatText(item.name || item.title || item.type || (custom ? "Повітряна загроза" : "Повітряна тривога"));
+        const rawSince = item.since == null || item.since === "" ? "-" : String(item.since);
+        const color = custom && /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(String(item.color || "")) ? String(item.color) : "";
+        const className = custom ? "is-custom" : ("is-" + level.kind);
+        const style = color ? ' style="border-color:' + safeThreatText(color) + ';--custom-threat-color:' + safeThreatText(color) + '"' : "";
+
+        if (custom) {
+          // Кастомний формат: иконка из alarm.json, причина, название, полный timestamp.
+          const reason = safeThreatText(item.reasons || item.reason || item.description || item.type || "Причину не вказано");
+          const since = safeThreatText(rawSince);
+          const customIconRaw = String(item.icon || "").trim();
+          const customIcon = /^https?:\/\//i.test(customIconRaw) ? safeThreatText(customIconRaw) : "";
+          const iconMarkup = customIcon
+            ? '<img class="mapHistoryCard__icon mapHistoryCard__customIcon" src="' + customIcon + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
+            : '';
+          return '<article class="mapHistoryCard is-custom"' + style + '>' +
+            '<div class="mapHistoryCard__identity">' + iconMarkup + '<div class="mapHistoryCard__customText">' +
+            '<strong>' + reason + '</strong><span class="mapHistoryCard__region custom-threat-name">' + title + '</span>' +
+            '</div></div><div class="mapHistoryCard__bottom"><span>' + since + ' — триває</span></div></article>';
+        }
+
+        // NEPTUN: use the official red/yellow icons and a compact HH:mm timestamp.
+        const iconUrl = level.kind === "yellow"
+          ? "https://map.ukrainealarm.com/images/content/icon_air_yellow.svg"
+          : "https://map.ukrainealarm.com/images/content/icon_air.svg";
+        const district = safeThreatText(item.raion || item.district || item.districtName || item.regionName || item.name || item.title || name);
+        const startValue = item.since || item.startedAt || item.startTime || item.start_time || item.createdAt || item.created_at || item.time || item.timestamp || item.alertSince || "";
+        let clock = "—";
+        if (startValue) {
+          const date = new Date(startValue);
+          if (!Number.isNaN(date.getTime())) clock = date.toLocaleTimeString("uk-UA", {hour:"2-digit", minute:"2-digit", hour12:false});
+          else clock = safeThreatText(String(startValue));
+        }
+        return '<article class="mapHistoryCard ' + className + '">' +
+          '<div class="mapHistoryCard__top"><div class="mapHistoryCard__identity">' +
+          '<img class="mapHistoryCard__icon" src="' + iconUrl + '" alt="" loading="lazy" referrerpolicy="no-referrer">' +
+          '<div><strong>Повітряна тривога</strong><span class="mapHistoryCard__level'+(level.kind === "yellow" ? "" : " red" )+'">' + safeThreatText(level.label) + '</span>' +
+          '<span class="mapHistoryCard__region">' + district + '</span></div></div></div>' +
+          '<div class="mapHistoryCard__bottom"><span>' + clock + ' — триває</span></div></article>';
+      }).join("") + '</section>';
+  }
+  if (!mapHistoryDialog.open) mapHistoryDialog.showModal();
+}
+function attachAreaHistory(layer, feature) {
+  const props = feature?.properties || {};
+  const name = String(props.name || props.NAME_1 || props.shapeName || props.admin1Name || props.NAME || "Область");
+  // Відкривати загрози лише для областей, не для районів.
+  layer.eachLayer?.(part => {
+    const customColor = customColorForOblast(name);
+    if (part.setStyle) part.setStyle({
+      interactive:true,
+      fillOpacity: customColor ? 0.32 : 0.025,
+      opacity: customColor ? 0.95 : 0.8,
+      weight: customColor ? 1.8 : 1.3,
+      color: customColor || "#8da8c0",
+      fillColor: customColor || "#8da8c0"
+    });
+    part.on?.("click", event => {
+      if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+      showAreaHistory(name);
+    });
+    part.on?.("mouseover", () => part.setStyle?.({weight:2.2, color:customColor || "#75baff", fillColor:customColor || "#8da8c0", fillOpacity:customColor ? 0.38 : 0.09}));
+    part.on?.("mouseout", () => part.setStyle?.({weight:customColor ? 1.8 : 1.3, color:customColor || "#8da8c0", fillColor:customColor || "#8da8c0", fillOpacity:customColor ? 0.32 : 0.025}));
+  });
+}
+async function loadCustomThreats() {
+  try {
+    const response = await fetch(CUSTOM_THREATS_URL + "?t=" + Date.now(), {cache:"no-store"});
+    if (!response.ok) throw new Error("alarm.json HTTP " + response.status);
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error("alarm.json має бути масивом");
+    customThreats = data.filter(item => item && typeof item === "object" && (item.name || item.oblast));
+    // Кастомні загрози щоразу завантажуються заново з актуального JSON.
+    // Rebuild the lightweight oblast overlay so custom colors update on the map.
+    if (window.areaHistoryGeoRef) {
+      window.areaHistoryGeoRef = null;
+      if (typeof renderAlertZones === "function") renderAlertZones();
+    }
+    if (mapHistoryDialog.open) showAreaHistory(mapHistoryTitle.textContent);
+    console.log("AirThreatMap custom threats:", customThreats.length);
+  } catch (error) {
+    console.warn("Не вдалося завантажити кастомні загрози:", error);
+    // Тимчасова помилка мережі не повинна стирати останні валідні дані.
+    if (mapHistoryDialog.open) showAreaHistory(mapHistoryTitle.textContent);
+  }
+}
 
 function renderAlertZones() {
 
@@ -2888,6 +2387,24 @@ function renderAlertZones() {
 
   }
 
+  // Build clickable area overlays only when GeoJSON changes; avoid rebuilding
+  // hundreds of polygons on every live alert refresh.
+  if (window.areaHistoryGeoRef?.oblasts !== oblastsGeoJSON ||
+      window.areaHistoryGeoRef?.raions !== raionsGeoJSON) {
+    if (window.areaHistoryHitLayer) window.areaHistoryHitLayer.clearLayers();
+    else window.areaHistoryHitLayer = L.layerGroup().addTo(map);
+    const hitLayer = window.areaHistoryHitLayer;
+    [oblastsGeoJSON].forEach(collection => {
+      if (!collection || !Array.isArray(collection.features)) return;
+      collection.features.forEach(feature => {
+        const hit = L.geoJSON(feature, {style:{color:"#8da8c0",weight:1.1,opacity:0.55,fillColor:"#8da8c0",fillOpacity:0.001},interactive:true});
+        attachAreaHistory(hit, feature);
+        hit.addTo(hitLayer);
+      });
+    });
+    window.areaHistoryGeoRef = {oblasts:oblastsGeoJSON, raions:raionsGeoJSON};
+  }
+  rememberAlertSnapshot();
   updateVisibility();
 
 }
@@ -3037,16 +2554,6 @@ function getThreatPosition(
 /* =========================================================
    THREAT TITLE
 ========================================================= */
-
-function escapeHTML(value) {
-  return String(value ?? "").replace(/[&<>"']/g, character => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  })[character]);
-}
 
 function getThreatTitle(
   threat
@@ -3227,7 +2734,10 @@ function renderNeptunThreats() {
           Помічана повітряна загроза
         </b>
         <br>
-        ${escapeHTML(getThreatTitle(threat) + emoji)}
+        ${getThreatTitle(
+            threat
+  
+          ) + emoji}
         ${
           threat.advisory
             ? `
@@ -3239,9 +2749,9 @@ function renderNeptunThreats() {
             : ""
         }
         <br>
-        Курс : ${threat.heading != null ? escapeHTML(String(threat.heading)) + "°" : "Невідомо"}
+        Курс : ${threat.heading != null?String(threat.heading) + "°":"Невідомо"}
            <br>
-       ${escapeHTML(threat.explanationShort || "Додаткова інформація відсутня")}  
+       ${threat.explanationShort}  
        
         
         </div>
@@ -3271,6 +2781,149 @@ function renderNeptunThreats() {
   updateVisibility();
 
 }
+function renderNahrThreats() {
+
+  const openThreatPopupKey = rememberOpenThreatPopup();
+
+  neptunThreatLayerGroup.clearLayers();
+
+  nahrThreats.forEach(
+    threat => {
+
+      /*
+       * areaOnly = true
+       *
+       * Не показуємо centroid
+       * як реальне місце загрози.
+       */
+
+      if (
+        threat?.areaOnly ===
+        true
+      ) {
+
+        return;
+
+      }
+
+      const position =
+        getThreatPosition(
+          threat
+        );
+
+      if (!position) {
+
+        return;
+
+      }
+
+      const category =
+        getNeptunThreatCategory(
+          threat
+        );
+
+      /*
+       * Шахед = категорія 2
+       */
+
+      if (
+        category !==
+        NEPTUN_CATEGORY_UAV
+      ) {
+
+        return;
+
+      }
+
+      const marker =
+        L.marker(
+          position,
+          {
+            icon:
+              createNeptunThreatIcon(
+                threat.type
+              )
+          }
+        );
+
+      marker._threatPopupKey = getThreatPopupKey(threat);
+
+      const type =
+    normalizeType(
+      threat?.type
+    );
+  let emoji =
+    "🚀";
+
+  if (type === "uav") {
+
+    emoji =
+      "🛩️";
+
+  }
+  else if (type === "fpv"){
+    emoji =
+      "🚁";
+  }
+  else if (type === "recon"){
+    emoji =
+      "✈️";
+  }
+      marker.bindPopup(
+        `
+        <div style="font-size:18px; line-height:1.35;">
+        <b>
+          Помічана повітряна загроза
+        </b>
+        <br>
+        ${getThreatTitle(
+            threat
+  
+          ) + emoji}
+        ${
+          threat.advisory
+            ? `
+              <br>
+              <br>
+              ⚠️ Спостереження
+              (advisory)
+            `
+            : ""
+        }
+        <br>
+        Курс : ${threat.heading != null?String(threat.heading) + "°":"Невідомо"}
+           <br>
+       ${threat.explanationShort}  
+       
+        
+        </div>
+        
+        <div style="font-size:13px !important;  line-height:1.35;">
+        <br>
+        <br>
+        Дані зібрано з <a style="font-size:13px !important;" href="https://neptun.in.ua/">NEPTUN</a>
+        `
+      );
+
+      marker._category =
+        NEPTUN_CATEGORY_UAV;
+
+      marker._neptunThreat =
+        true;
+
+      marker.addTo(
+        neptunThreatLayerGroup
+      );
+
+    }
+  );
+
+  restoreOpenThreatPopup(openThreatPopupKey);
+
+  updateVisibility();
+
+}
+
 /* =========================================================
    LOAD NEPTUN ALERTS REST
 ========================================================= */
@@ -3301,7 +2954,7 @@ async function loadNeptunAlerts() {
 
     const data =
       await response.json();
-
+    
     /*
      * API має повернути обидва масиви.
      *
@@ -3323,6 +2976,7 @@ async function loadNeptunAlerts() {
       );
 
     }
+    
 
     /*
      * Райони
@@ -3338,15 +2992,8 @@ async function loadNeptunAlerts() {
     neptunAlertOblasts =
       data.oblasts;
     
-    console.log(
-      "NEPTUN райони:",
-      neptunAlerts
-    );
+    
 
-    console.log(
-      "NEPTUN області:",
-      neptunAlertOblasts
-    );
 
     renderAlertZones();
 
@@ -3360,8 +3007,6 @@ async function loadNeptunAlerts() {
      * Зберігаємо тільки після
      * успішної валідної відповіді.
      */
-
-    await saveOfflineState();
 
   } catch (error) {
 
@@ -3458,17 +3103,12 @@ async function loadNeptunThreats() {
     renderNeptunThreats();
 
     updateCategoryCounts();
-    console.log(
-      "NEPTUN:",
-      data
-    );
+    console.debug("NEPTUN threats updated:", neptunThreats.length);
     updateStatus();
 
     /*
      * Зберігаємо актуальні загрози.
      */
-
-    await saveOfflineState();
 
   } catch (error) {
 
@@ -3533,116 +3173,27 @@ function updateAlertBadge() {
 ========================================================= */
 
 function updateStatus() {
+  const status = document.getElementById("status");
+  if (!status) return;
 
-  const status =
-    document.getElementById(
-      "status"
-    );
+  const alerts = neptunAlerts.length + neptunAlertOblasts.length;
+  const uavs = neptunThreats.filter(threat =>
+    getNeptunThreatCategory(threat) === NEPTUN_CATEGORY_UAV
+  ).length;
+  const news = sheetObjects.filter(obj => getSheetCategory(obj) === "13").length;
+  const networkText = navigator.onLine ? "🟢 ОНЛАЙН" : "🔴 ОФЛАЙН";
 
-  if (!status) {
-    return;
-  }
-
-  const alerts =
-    neptunAlerts.length +
-    neptunAlertOblasts.length;
-
-  const uavs =
-    neptunThreats.filter(
-      threat =>
-        getNeptunThreatCategory(
-          threat
-        ) ===
-        NEPTUN_CATEGORY_UAV
-    ).length;
-
-  const news =
-    sheetObjects.filter(
-      obj =>
-        getSheetCategory(
-          obj
-        ) === "13"
-    ).length;
-
-  /*
-   * Кеш показуємо ЗАВЖДИ.
-   */
-  let cacheText =
-    "перевірка...";
-
-  if (offlineCacheLoaded) {
-
-    cacheText =
-      offlineCacheSavedAt
-        ? formatCacheAge(
-            offlineCacheSavedAt
-          )
-        : "збережено";
-
-  } else if (
-    !navigator.onLine
-  ) {
-
-    cacheText =
-      "даних немає";
-
-  } else {
-
-    cacheText =
-      "порожній";
-
-  }
-
-  const networkText =
-    navigator.onLine
-      ? "🟢 ОНЛАЙН"
-      : "🔴 ОФЛАЙН";
-
-  const cacheMode =
-    offlineCacheLoaded
-      ? (
-          navigator.onLine
-            ? "збережені дані доступні"
-            : "показано збережені дані"
-        )
-      : (
-          navigator.onLine
-            ? "кеш ще не завантажено"
-            : "збережених даних немає"
-        );
-
-  status.innerHTML =
-    `
+  status.innerHTML = `
     ${networkText}
-
-    <br>
-    ${cacheMode}
-
-    <br>
-    Кеш:
-    ${cacheText}
-
     <br><br>
-
-    Google Sheets:
-    ${sheetObjects.length}
-
+    Google Sheets: ${sheetObjects.length}
     <br>
-
-    📰 Новин:
-    ${news}
-
+    📰 Новин: ${news}
     <br>
-
-    NEPTUN тривог:
-    ${alerts}
-
+    NEPTUN тривог: ${alerts}
     <br>
-
-    NEPTUN БпЛА:
-    ${uavs}
-    `;
-
+    NEPTUN БпЛА: ${uavs}
+  `;
 }
 
 /* =========================================================
@@ -3770,12 +3321,8 @@ function startNeptunRealtime() {
            * ВАЖЛИВО:
            *
            * realtime snapshot може не містити
-           * GeoJSON, тому saveOfflineState()
-           * бере вже наявний GeoJSON і не
-           * затирає його null-ом.
+           * GeoJSON, тому дані не записуються в постійне сховище.
            */
-
-          saveOfflineState();
 
         }
 
@@ -3799,7 +3346,18 @@ function startNeptunRealtime() {
 
 }
 
-/* Marker layers are kept intact during zoom to avoid flicker and popup closure. */
+/* =========================================================
+   MAP ZOOM
+========================================================= */
+
+map.on(
+  "zoomend",
+  function() {
+
+    renderNeptunThreats();
+
+  }
+);
 
 /* =========================================================
    RESIZE
@@ -3831,6 +3389,16 @@ window.addEventListener(
   }
 );
 
+
+/* Не запускаємо повторний polling того самого джерела, поки попередній запит не завершився. */
+const activePolls = new Set();
+async function runPollOnce(key, task) {
+  if (activePolls.has(key) || !navigator.onLine) return;
+  activePolls.add(key);
+  try { await task(); }
+  finally { activePolls.delete(key); }
+}
+
 /* =========================================================
    INITIALIZATION
 ========================================================= */
@@ -3839,39 +3407,8 @@ async function init() {
 
   createCategoryPanel();
 
-  /*
-   * =======================================================
-   * ПЕРШИЙ КРОК:
-   * ВІДНОВЛЕННЯ INDEXEDDB
-   * =======================================================
-   *
-   * Це спеціально виконується ПЕРЕД мережевими запитами.
-   *
-   * Якщо користувач відкрив карту офлайн,
-   * тут одразу з'являться старі маркери,
-   * тривоги та GeoJSON.
-   */
-
-  try {
-
-    await restoreOfflineState();
-
-  } catch (error) {
-
-    console.warn(
-      "OFFLINE restore:",
-      error
-    );
-
-  }
-
-  /*
-   * Після відновлення кешу карта вже може
-   * бути показана користувачу.
-   */
-
+  // No persistent cache restoration: fetch current data on every page load.
   updateVisibility();
-
   updateStatus();
 
   /*
@@ -3881,7 +3418,7 @@ async function init() {
    *
    * Не покладаємося тільки на navigator.onLine.
    * На телефонах він інколи каже "online", хоча fetch
-   * фактично не працює. Кеш у такому випадку залишається.
+   * фактично не працює. Дані не зберігаються між відкриттями сторінки.
    */
 
   updateStatus();
@@ -3890,7 +3427,8 @@ async function init() {
     loadNeptunGeoJSON(),
     loadNeptunAlerts(),
     loadNeptunThreats(),
-    
+    loadMapaThreats(),
+    loadCustomThreats()
   ];
 
   await Promise.allSettled(
@@ -3926,12 +3464,12 @@ async function init() {
         navigator.onLine
       ) {
 
-        loadNeptunAlerts();
+        runPollOnce("neptun-alerts", loadNeptunAlerts);
 
       }
 
     },
-    5000
+    15000
   );
   
   setInterval(
@@ -3941,17 +3479,27 @@ async function init() {
         navigator.onLine
       ) {
 
-        loadNeptunThreats();
+        runPollOnce("neptun-threats", loadNeptunThreats);
 
       }
 
     },
-    5000
+    15000
   );
 
+  setInterval(
+    function() {
+      if (navigator.onLine) {
+        runPollOnce("mapa-threats", loadMapaThreats);
+      }
+    },
+    15000
+  );
+
+  setInterval(function() { runPollOnce("custom-threats", loadCustomThreats); }, 60000);
+
   /*
-   * Оновлюємо статус кешу періодично,
-   * щоб час "N хв. тому" був актуальним.
+   * Оновлюємо індикатор мережі періодично.
    */
 
   setInterval(
@@ -3978,4 +3526,4 @@ init();
 </script>
 
 </body>
-  </html>
+</html>
