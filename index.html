@@ -56,10 +56,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 .category input{appearance:none;flex:0 0 18px;width:18px;height:18px;margin:0;border:1.5px solid #718392;border-radius:5px;background:#111a23;cursor:pointer;display:grid;place-items:center}
 .category input:checked{background:var(--accent);border-color:var(--accent)}
 .category input:checked:after{content:"";width:8px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg);margin-top:-2px}
-.category.is-disabled{opacity:.48;cursor:not-allowed;background:#ffffff04}
-.category input:disabled{cursor:not-allowed;opacity:.7}
-.category.is-disabled:hover{background:#ffffff04;border-color:transparent}
 .category-name{flex:1;font-size:13px;font-weight:600;color:#dce7ef;line-height:1.35}
+.category-disabled{opacity:.48;cursor:not-allowed;filter:saturate(.55)}
+.category-disabled input{cursor:not-allowed}
 .category-count{min-width:28px;padding:4px 7px;border-radius:7px;background:#2a3947;color:#d8e6f1;font-size:11px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums}
 #status{margin-top:14px;padding:12px 12px;border:1px solid var(--line);border-radius:10px;background:#0f1821;color:var(--muted);font-size:11px;line-height:1.55}
 #alertBadge{margin-top:10px;padding:10px;border-radius:10px;background:#ff4d5e20;border:1px solid #ff4d5e80;color:#ff8994;font-weight:750;font-size:12px;text-align:center;animation:alertPulse 3s infinite}
@@ -83,6 +82,32 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 .leaflet-popup-content b,.leaflet-popup-content strong{font-size:15px!important}
 .leaflet-popup-content a{font-size:13px!important;color:#8fc5ff!important}
 .leaflet-popup-close-button{color:#c7d5e0!important}
+
+
+/* Premium UAV information card */
+.leaflet-popup-content-wrapper.uav-popup-shell{padding:0;overflow:hidden;background:#101923;border:1px solid #34495b;border-radius:18px;box-shadow:0 18px 48px #0009;color:#edf6ff}
+.leaflet-popup-content.uav-popup-content{width:min(340px,calc(100vw - 76px))!important;max-width:calc(100vw - 76px)!important;margin:0!important;font-size:14px!important;line-height:1.5!important}
+.uav-card{overflow:hidden;border-radius:17px;background:linear-gradient(160deg,#182737 0%,#101923 70%)}
+.uav-card__head{display:flex;align-items:center;gap:12px;padding:16px 16px 14px;background:linear-gradient(120deg,#203b50,#182638);border-bottom:1px solid #ffffff12}
+.uav-card__symbol{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border:1px solid #ffbd5966;border-radius:15px;background:linear-gradient(145deg,#ffb84d2b,#ff8b2020);font-size:25px;box-shadow:inset 0 1px #ffffff16}
+.uav-card__eyebrow{font-size:10px;letter-spacing:1.35px;text-transform:uppercase;font-weight:800;color:#a9c4d8}
+.uav-card__title{margin-top:3px;font-size:17px;font-weight:800;line-height:1.25;color:#f6fbff;overflow-wrap:anywhere}
+.uav-card__body{padding:14px 16px 15px}
+.uav-card__badge{display:inline-flex;align-items:center;gap:7px;margin-bottom:13px;padding:6px 9px;border:1px solid #f5ad4d55;border-radius:999px;background:#f5ad4d15;color:#ffd08b;font-size:11px;font-weight:750}
+.uav-card__dot{width:7px;height:7px;border-radius:50%;background:#ffbd59;box-shadow:0 0 9px #ffbd5980}
+.uav-card__grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.uav-card__metric{min-width:0;padding:10px 11px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff06}
+.uav-card__label{font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:#93a9ba;font-weight:750}
+.uav-card__value{margin-top:4px;font-size:14px;font-weight:750;color:#f0f7fd;overflow-wrap:anywhere}
+.uav-card__description{margin-top:12px;padding:11px 12px;border-left:3px solid #70b9ef;border-radius:0 10px 10px 0;background:#6cb8f010;color:#d5e3ed;font-size:12px;overflow-wrap:anywhere}
+.uav-card__advisory{margin:0 0 12px;padding:9px 10px;border:1px solid #f5ad4d55;border-radius:10px;background:#f5ad4d12;color:#ffd08b;font-size:12px;font-weight:700}
+.uav-card__foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 16px;border-top:1px solid #ffffff12;color:#8298a9;font-size:10px}
+.uav-card__source{color:#a8d7ff!important;font-size:11px!important;font-weight:800;text-decoration:none}
+.uav-card__source:hover{text-decoration:underline}
+.leaflet-popup-content-wrapper:has(.uav-card){padding:0}
+.leaflet-popup-content:has(.uav-card){margin:0!important}
+.leaflet-popup-tip{background:#101923!important}
+@media(max-width:480px){.uav-card__head{padding:13px}.uav-card__body{padding:12px}.uav-card__foot{padding:10px 12px}.uav-card__title{font-size:16px}}
 
 /* Alert history dialog */
 .mapHistory{width:min(680px,calc(100vw - 28px));max-width:none;max-height:min(88vh,760px);padding:0;border:1px solid #ffffff24;border-radius:14px;background:#282d33;color:#edf0f4;box-shadow:0 24px 80px #000a;overflow:hidden}
@@ -289,8 +314,7 @@ const categories = {
     radius: 2500,
     color: "#ff9900",
     minZoom: 0,
-    show: false,
-    disabled: true
+    show: false
   },
 
 };
@@ -479,14 +503,14 @@ window.addEventListener(
 
     
 
-    runPollOnce("neptun-alerts", loadNeptunAlerts);
+    loadNeptunAlerts();
     
 
-    runPollOnce("neptun-threats", loadNeptunThreats);
+    loadNeptunThreats();
 
-    runPollOnce("mapa-threats", loadMapaThreats);
+    loadMapaThreats();
 
-    runPollOnce("neptun-geojson", loadNeptunGeoJSON);
+    loadNeptunGeoJSON();
 
     if (
       !neptunRealtimeClient
@@ -654,15 +678,15 @@ function createCategoryPanel() {
       checkbox.type =
         "checkbox";
 
+      // Категорія 3 зарезервована для розширеного режиму й вимкнена.
+      checkbox.disabled = (id === "3");
+      if (id === "3") {
+        row.classList.add("category-disabled");
+        row.title = "Ця категорія наразі вимкнена";
+      }
+
       checkbox.checked =
         visibleCategories[id];
-
-      checkbox.disabled = Boolean(category.disabled);
-      if (category.disabled) {
-        row.classList.add("is-disabled");
-        row.title = "Цю категорію тимчасово вимкнено";
-        checkbox.setAttribute("aria-label", category.name + " — вимкнено");
-      }
 
       checkbox.dataset.category =
         id;
@@ -1154,7 +1178,10 @@ async function loadMapaThreats() {
     updateCategoryCounts();
     updateStatus();
 
-    console.debug("MAPA.UA threats updated:", mapaThreats.length);
+    console.log(
+      "MAPA.UA:",
+      mapaThreats
+    );
 
   } catch (error) {
 
@@ -2205,7 +2232,8 @@ async function loadCustomThreats() {
     console.log("AirThreatMap custom threats:", customThreats.length);
   } catch (error) {
     console.warn("Не вдалося завантажити кастомні загрози:", error);
-    // Тимчасова помилка мережі не повинна стирати останні валідні дані.
+    // Якщо джерело недоступне, не показуємо застарілі загрози.
+    customThreats = [];
     if (mapHistoryDialog.open) showAreaHistory(mapHistoryTitle.textContent);
   }
 }
@@ -2551,6 +2579,45 @@ function getThreatPosition(
 }
 
 
+
+function escapeThreatPopupText(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildThreatPopup(threat, emoji) {
+  const type = normalizeType(threat?.type);
+  const title = escapeThreatPopupText(getThreatTitle(threat));
+  const heading = threat?.heading != null && Number.isFinite(Number(threat.heading))
+    ? `${escapeThreatPopupText(String(threat.heading))}°`
+    : "Невідомо";
+  const explanation = escapeThreatPopupText(threat?.explanationShort || "Додаткового опису немає.");
+  const typeLabel = type === "uav" ? "БЕЗПІЛОТНИЙ ЛІТАЛЬНИЙ АПАРАТ" : "ПОВІТРЯНИЙ ОБ’ЄКТ";
+  return `
+    <div class="uav-card">
+      <div class="uav-card__head">
+        <div class="uav-card__symbol" aria-hidden="true">${emoji}</div>
+        <div>
+          <div class="uav-card__eyebrow">${typeLabel}</div>
+          <div class="uav-card__title">${title}</div>
+        </div>
+      </div>
+      <div class="uav-card__body">
+        ${threat?.advisory ? '<div class="uav-card__advisory">⚠️ Спостереження · advisory</div>' : ''}
+        <div class="uav-card__grid">
+          <div class="uav-card__metric"><div class="uav-card__label">Курс</div><div class="uav-card__value">${heading}</div></div>
+          <div class="uav-card__metric"><div class="uav-card__label">Джерело</div><div class="uav-card__value">NEPTUN</div></div>
+        </div>
+        <div class="uav-card__description">${explanation}</div>
+      </div>
+      <div class="uav-card__foot"><span>Інформаційне повідомлення</span><a class="uav-card__source" href="https://neptun.in.ua/" target="_blank" rel="noopener noreferrer">ДЖЕРЕЛО ↗</a></div>
+    </div>`;
+}
+
 /* =========================================================
    THREAT TITLE
 ========================================================= */
@@ -2728,39 +2795,7 @@ function renderNeptunThreats() {
       "✈️";
   }
       marker.bindPopup(
-        `
-        <div style="font-size:18px; line-height:1.35;">
-        <b>
-          Помічана повітряна загроза
-        </b>
-        <br>
-        ${getThreatTitle(
-            threat
-  
-          ) + emoji}
-        ${
-          threat.advisory
-            ? `
-              <br>
-              <br>
-              ⚠️ Спостереження
-              (advisory)
-            `
-            : ""
-        }
-        <br>
-        Курс : ${threat.heading != null?String(threat.heading) + "°":"Невідомо"}
-           <br>
-       ${threat.explanationShort}  
-       
-        
-        </div>
-        
-        <div style="font-size:13px !important;  line-height:1.35;">
-        <br>
-        <br>
-        Дані зібрано з <a style="font-size:13px !important;" href="https://neptun.in.ua/">NEPTUN</a>
-        `
+        buildThreatPopup(threat, emoji)
       );
 
       marker._category =
@@ -2870,39 +2905,7 @@ function renderNahrThreats() {
       "✈️";
   }
       marker.bindPopup(
-        `
-        <div style="font-size:18px; line-height:1.35;">
-        <b>
-          Помічана повітряна загроза
-        </b>
-        <br>
-        ${getThreatTitle(
-            threat
-  
-          ) + emoji}
-        ${
-          threat.advisory
-            ? `
-              <br>
-              <br>
-              ⚠️ Спостереження
-              (advisory)
-            `
-            : ""
-        }
-        <br>
-        Курс : ${threat.heading != null?String(threat.heading) + "°":"Невідомо"}
-           <br>
-       ${threat.explanationShort}  
-       
-        
-        </div>
-        
-        <div style="font-size:13px !important;  line-height:1.35;">
-        <br>
-        <br>
-        Дані зібрано з <a style="font-size:13px !important;" href="https://neptun.in.ua/">NEPTUN</a>
-        `
+        buildThreatPopup(threat, emoji)
       );
 
       marker._category =
@@ -2955,6 +2958,10 @@ async function loadNeptunAlerts() {
     const data =
       await response.json();
     
+    const daaa= await data
+    console.log(
+      daaa
+    );
     /*
      * API має повернути обидва масиви.
      *
@@ -2992,8 +2999,16 @@ async function loadNeptunAlerts() {
     neptunAlertOblasts =
       data.oblasts;
     
+    console.log(
+      "NEPTUN райони:",
+      neptunAlerts
+    );
     
 
+    console.log(
+      "NEPTUN області:",
+      neptunAlertOblasts
+    );
 
     renderAlertZones();
 
@@ -3103,7 +3118,10 @@ async function loadNeptunThreats() {
     renderNeptunThreats();
 
     updateCategoryCounts();
-    console.debug("NEPTUN threats updated:", neptunThreats.length);
+    console.log(
+      "NEPTUN:",
+      data
+    );
     updateStatus();
 
     /*
@@ -3389,16 +3407,6 @@ window.addEventListener(
   }
 );
 
-
-/* Не запускаємо повторний polling того самого джерела, поки попередній запит не завершився. */
-const activePolls = new Set();
-async function runPollOnce(key, task) {
-  if (activePolls.has(key) || !navigator.onLine) return;
-  activePolls.add(key);
-  try { await task(); }
-  finally { activePolls.delete(key); }
-}
-
 /* =========================================================
    INITIALIZATION
 ========================================================= */
@@ -3464,7 +3472,7 @@ async function init() {
         navigator.onLine
       ) {
 
-        runPollOnce("neptun-alerts", loadNeptunAlerts);
+        loadNeptunAlerts();
 
       }
 
@@ -3479,7 +3487,7 @@ async function init() {
         navigator.onLine
       ) {
 
-        runPollOnce("neptun-threats", loadNeptunThreats);
+        loadNeptunThreats();
 
       }
 
@@ -3490,13 +3498,13 @@ async function init() {
   setInterval(
     function() {
       if (navigator.onLine) {
-        runPollOnce("mapa-threats", loadMapaThreats);
+        loadMapaThreats();
       }
     },
     15000
   );
 
-  setInterval(function() { runPollOnce("custom-threats", loadCustomThreats); }, 60000);
+  setInterval(function() { if (navigator.onLine) loadCustomThreats(); }, 60000);
 
   /*
    * Оновлюємо індикатор мережі періодично.
