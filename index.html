@@ -108,6 +108,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 .mapHistoryCard__identity>div{display:flex;flex-direction:column;gap:3px}
 .mapHistoryCard__identity strong{font-size:14px}
 .mapHistoryCard__level{font-size:12px;color:#f2c94c;font-weight:700}
+.mapHistoryCard__level.red{color:#f18d85}
 .mapHistoryCard__region,.mapHistoryCard__duration{font-size:12px;color:#aab3bd;font-weight:600}
 .mapHistoryCard__ongoing{font-size:11px;border:1px solid #a18b46;border-radius:4px;padding:4px 7px;color:#f2c94c}
 .mapHistoryCard__bottom{border-top:1px solid #ffffff20;padding-top:12px;margin-top:12px;font-size:14px;font-weight:700}
@@ -139,7 +140,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;font-family:
 <div id="map"></div>
 <dialog class="mapHistory" id="mapHistory" aria-labelledby="map-history-title" aria-modal="true">
   <header class="mapHistory__head">
-    <div><span>Теперішні загрози</span><h2 id="map-history-title">Область</h2></div>
+    <div><span>Активні загрози</span><h2 id="map-history-title">Область</h2></div>
     <button type="button" class="mapHistory__close" id="mapHistoryClose" aria-label="Закрити історію">×</button>
   </header>
   <div class="mapHistory__body" id="mapHistoryBody" aria-live="polite"></div>
@@ -2108,9 +2109,9 @@ function showAreaHistory(name) {
   const neptunItems = getNeptunAreaItems(name);
   const items = [...neptunItems, ...customItems];
   if (!items.length) {
-    mapHistoryBody.innerHTML = '<div class="mapHistory__empty">Для цієї області зараз немає активних загроз у NEPTUN або записів у alarm.json.</div><p class="history-hint">Дані оновлюються автоматично. Завжди орієнтуйся також на офіційні сповіщення.</p>';
+    mapHistoryBody.innerHTML = '<div class="mapHistory__empty">Для цієї області зараз немає активних загроз.</div><p class="history-hint">Дані оновлюються автоматично. Завжди орієнтуйся також на офіційні сповіщення.</p>';
   } else {
-    mapHistoryBody.innerHTML = '<section class="mapHistory__day"><h3>Теперішні загрози · ' + items.length + '</h3>' +
+    mapHistoryBody.innerHTML = '<section class="mapHistory__day"><h3>Активні загрози · ' + items.length + '</h3>' +
       items.map(item => {
         const custom = item._source === "CUSTOM";
         const level = threatLevelInfo(item.level);
@@ -2150,10 +2151,12 @@ function showAreaHistory(name) {
         return '<article class="mapHistoryCard ' + className + '">' +
           '<div class="mapHistoryCard__top"><div class="mapHistoryCard__identity">' +
           '<img class="mapHistoryCard__icon" src="' + iconUrl + '" alt="" loading="lazy" referrerpolicy="no-referrer">' +
-          '<div><strong>Повітряна тривога</strong><span class="mapHistoryCard__level">' + safeThreatText(level.label) + '</span>' +
+          '<div><strong>Повітряна тривога</strong><span class="mapHistoryCard__level'+level.kind === "yellow"
+          ? "
+          : " red";+'">' + safeThreatText(level.label) + '</span>' +
           '<span class="mapHistoryCard__region">' + district + '</span></div></div></div>' +
           '<div class="mapHistoryCard__bottom"><span>' + clock + ' — триває</span></div></article>';
-      }).join("") + '</section><p class="history-hint">NEPTUN + AirThreatMap alarm.json · кастомний колір показується на карті лише для level понад 1.</p>';
+      }).join("") + '</section>';
   }
   if (!mapHistoryDialog.open) mapHistoryDialog.showModal();
 }
