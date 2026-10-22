@@ -468,7 +468,6 @@ let oblastsGeoJSON = null;
 // Clean up data saved by older versions. Current page data stays in memory only.
 try {
   localStorage.removeItem("MapaPodiyUA_Offline_v2");
-  localStorage.removeItem("MapaPodiyUA_customThreats_v1");
 } catch (_) {}
 try {
   if (window.indexedDB) indexedDB.deleteDatabase("MapaPodiyUA_Offline");
@@ -2064,7 +2063,20 @@ async function loadNeptunGeoJSON() {
    Data source: AirThreatMap alarm.json
 ========================================================= */
 const CUSTOM_THREATS_URL = "https://eso-net-live.github.io/AirThreatMap/alarm.json";
+const CUSTOM_THREATS_CACHE_KEY = "MapaPodiyUA_customThreats_v1";
 let customThreats = [];
+let customThreatsRequestInFlight = false;
+
+// Restore the last successfully loaded custom alerts immediately. A temporary
+// network error must never erase the currently displayed custom alerts.
+try {
+  const savedCustomThreats = JSON.parse(localStorage.getItem(CUSTOM_THREATS_CACHE_KEY) || "null");
+  if (Array.isArray(savedCustomThreats)) {
+    customThreats = savedCustomThreats.filter(item => item && typeof item === "object" && (item.name || item.oblast));
+  }
+} catch (cacheError) {
+  console.warn("Не вдалося прочитати кеш кастомних тривог:", cacheError);
+}
 const mapHistoryDialog = document.getElementById("mapHistory");
 const mapHistoryBody = document.getElementById("mapHistoryBody");
 const mapHistoryTitle = document.getElementById("map-history-title");
@@ -2216,14 +2228,29 @@ function attachAreaHistory(layer, feature) {
   });
 }
 async function loadCustomThreats() {
+  // Avoid overlapping polls: slow connections must not cause older requests
+  // to overwrite a newer successful result.
+  if (customThreatsRequestInFlight) return;
+  customThreatsRequestInFlight = true;
   try {
-    const response = await fetch(CUSTOM_THREATS_URL + "?t=" + Date.now(), {cache:"no-store"});
+    const response = await fetch(CUSTOM_THREATS_URL + "?t=" + Date.now(), {
+      cache: "no-store",
+      headers: { "Accept": "application/json" }
+    });
     if (!response.ok) throw new Error("alarm.json HTTP " + response.status);
     const data = await response.json();
     if (!Array.isArray(data)) throw new Error("alarm.json має бути масивом");
-    customThreats = data.filter(item => item && typeof item === "object" && (item.name || item.oblast));
-    // Кастомні загрози щоразу завантажуються заново з актуального JSON.
-    // Rebuild the lightweight oblast overlay so custom colors update on the map.
+
+    const nextThreats = data.filter(item => item && typeof item === "object" && (item.name || item.oblast));
+    // Replace the current list only after a complete, valid response arrives.
+    customThreats = nextThreats;
+    try {
+      localStorage.setItem(CUSTOM_THREATS_CACHE_KEY, JSON.stringify(customThreats));
+    } catch (cacheError) {
+      // Private browsing / full storage must not break alert rendering.
+      console.warn("Не вдалося зберегти кеш кастомних тривог:", cacheError);
+    }
+
     if (window.areaHistoryGeoRef) {
       window.areaHistoryGeoRef = null;
       if (typeof renderAlertZones === "function") renderAlertZones();
@@ -2231,10 +2258,12 @@ async function loadCustomThreats() {
     if (mapHistoryDialog.open) showAreaHistory(mapHistoryTitle.textContent);
     console.log("AirThreatMap custom threats:", customThreats.length);
   } catch (error) {
-    console.warn("Не вдалося завантажити кастомні загрози:", error);
-    // Якщо джерело недоступне, не показуємо застарілі загрози.
-    customThreats = [];
+    console.warn("Не вдалося оновити кастомні тривоги; залишаємо останні доступні дані:", error);
+    // Intentionally preserve customThreats. Transient GitHub/network errors
+    // previously emptied this array, making custom alerts disappear until reload.
     if (mapHistoryDialog.open) showAreaHistory(mapHistoryTitle.textContent);
+  } finally {
+    customThreatsRequestInFlight = false;
   }
 }
 
