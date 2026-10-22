@@ -4,6 +4,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#111820">
+<meta name="description" content="Інтерактивна мапа повітряних загроз України">
+<link rel="manifest" href="./manifest.json">
 
 <title>Мапа повітряних тривог України</title>
 
@@ -3560,6 +3563,49 @@ async function init() {
 
 init();
 
+</script>
+
+
+<style>
+#pwaInstallButton{
+ position:fixed;z-index:2500;right:14px;top:14px;
+ border:1px solid #ffffff24;border-radius:12px;padding:10px 13px;
+ color:#edf4fa;background:rgba(24,35,46,.96);font:600 13px/1.2 system-ui,sans-serif;
+ box-shadow:0 6px 22px #0005;cursor:pointer;backdrop-filter:blur(12px)
+}
+#pwaInstallButton:hover{background:#263747}
+#pwaInstallButton[hidden]{display:none}
+@media(max-width:600px){#pwaInstallButton{top:auto;bottom:56px;right:10px;padding:9px 11px}}
+</style>
+<button id="pwaInstallButton" type="button" hidden>⬇ Встановити застосунок</button>
+<script>
+(() => {
+  const button = document.getElementById('pwaInstallButton');
+  let installPrompt = null;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (!isStandalone) button.hidden = false;
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    installPrompt = event;
+    button.hidden = false;
+    button.textContent = '⬇ Встановити застосунок';
+  });
+  button.addEventListener('click', async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      await installPrompt.userChoice;
+      installPrompt = null;
+      button.hidden = true;
+    } else {
+      alert('Щоб встановити AirThreatMap: відкрийте сайт у Chrome або Edge та виберіть «Встановити застосунок» або «Додати на головний екран». Для встановлення сайт має бути відкритий через HTTPS.');
+    }
+  });
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js').catch(err => console.warn('Service worker registration failed:', err));
+    });
+  }
+})();
 </script>
 
 </body>
